@@ -1,71 +1,95 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Header from "./components/Header";
 import AvailableTimes from "./components/AvailableTimes";
 import BottomNavigation from "./components/BottomNavigation";
+import LoginButton from "./components/LoginButton";
+import UnauthenticatedView from "./components/UnauthenticatedView";
+import { api } from "./utils/api";
 
-export default function App() {
+function AppContent() {
+  const { isAuthenticated, loading } = useAuth();
   const [selectedCourt, setSelectedCourt] = useState(1);
-  // Store single active reservation: { court: number, time: string } or null
   const [activeReservation, setActiveReservation] = useState<{
     court: number;
     time: string;
   } | null>(null);
-
-  // Timer state for each court (in seconds)
-  const [timers, setTimers] = useState<{ [key: number]: number | null }>({
-    1: null,
-    2: null,
-    3: null,
+  const [hasActiveCourtUsage, setHasActiveCourtUsage] = useState(false);
+  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+  const [courtStatus, setCourtStatus] = useState({
+    status: "Open",
+    time: null,
+    color: "text-green-500",
   });
+  const [error, setError] = useState<string | null>(null);
 
-  // Timer countdown effect
+  // Load initial data
   useEffect(() => {
+    if (isAuthenticated) {
+      loadTimeSlots();
+      loadCourtUsageStatus();
+      loadCourtStatus(selectedCourt);
+    }
+  }, [isAuthenticated, selectedCourt]);
+
+  // Auto-refresh court status and usage status
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
     const interval = setInterval(() => {
-      setTimers((prev) => {
-        const newTimers = { ...prev };
-
-        // Update each court's timer
-        Object.keys(newTimers).forEach((courtKey) => {
-          const court = Number(courtKey);
-          if (newTimers[court] !== null && newTimers[court]! > 0) {
-            newTimers[court] = newTimers[court]! - 1;
-          } else if (newTimers[court] === 0) {
-            newTimers[court] = null; // Court becomes open when timer reaches 0
-          }
-        });
-
-        return newTimers;
-      });
-    }, 1000); // Update every second
+      loadCourtStatus(selectedCourt);
+      loadCourtUsageStatus();
+    }, 5000); // Refresh every 5 seconds
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isAuthenticated, selectedCourt]);
 
-  // Format seconds to MM:SS
-  const formatTime = (seconds: number | null) => {
-    if (seconds === null) return null;
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${minutes}:${secs.toString().padStart(2, "0")}`;
+  const loadTimeSlots = async () => {
+    try {
+      setError(null);
+      const data = await api.getTimeSlots();
+      setAvailableTimes(data.timeSlots.map((slot: any) => slot.time));
+    } catch (error: any) {
+      console.error("Error loading time slots:", error);
+      setError("Failed to load available times");
+      // Set default times as fallback
+      setAvailableTimes(["2:00 pm", "2:30 pm", "3:00 pm", "3:30 pm"]);
+    }
   };
 
-  // Get formatted time for display
-  const getCurrentTime = (courtNum: number) => {
-    return formatTime(timers[courtNum]);
+  const loadCourtUsageStatus = async () => {
+    try {
+      const data = await api.getCourtUsageStatus();
+      setHasActiveCourtUsage(data.hasActiveCourtUsage);
+    } catch (error) {
+      console.error("Error loading court usage status:", error);
+    }
   };
 
-  const availableTimes = ["2:00 pm", "2:30 pm", "3:00 pm", "3:30 pm"];
+  const loadCourtStatus = async (courtId: number) => {
+    try {
+      const data = await api.getCourtStatus(courtId);
+      setCourtStatus(data);
+    } catch (error) {
+      console.error("Error loading court status:", error);
+      setCourtStatus({ status: "Open", time: null, color: "text-green-500" });
+    }
+  };
 
-  const handleReserve = (time: string) => {
-    // Replace any existing reservation with the new one
-    setActiveReservation({
-      court: selectedCourt,
-      time: time,
-    });
+  const handleReserve = async (time: string) => {
+    try {
+      setError(null);
+      await api.makeReservation(selectedCourt, time);
+      setActiveReservation({ court: selectedCourt, time });
+      // Refresh status
+      loadCourtUsageStatus();
+    } catch (error: any) {
+      console.error("Error making reservation:", error);
+      setError(error.message || "Failed to make reservation");
+    }
   };
 
   const isReserved = (time: string) => {
-    // Check if this time slot on this court is the active reservation
     return (
       activeReservation?.court === selectedCourt &&
       activeReservation?.time === time
@@ -76,16 +100,9 @@ export default function App() {
     return activeReservation !== null;
   };
 
-  const hasActiveCourtUsage = () => {
-    // Check if ANY court has an active timer (someone clicked "Take")
-    return Object.values(timers).some((timer) => timer !== null);
-  };
-
   const canReserve = (time: string) => {
-    // Can't reserve if:
-    // 1. Court is currently being used (timer active), OR
-    // 2. User has a reservation on a different court
-    if (hasActiveCourtUsage()) {
+    // Can't reserve if any court is being used
+    if (hasActiveCourtUsage) {
       return false;
     }
 
@@ -93,75 +110,54 @@ export default function App() {
     return !hasActiveReservation() || isReserved(time);
   };
 
-  const getCourtStatus = (courtNum: number) => {
-    const time = getCurrentTime(courtNum);
-    if (time) {
-      return { status: "In Use", time: time, color: "text-red-500" };
+  const startCourtTimer = async () => {
+    try {
+      setError(null);
+      await api.takeCourt(selectedCourt);
+      // Clear any existing reservation
+      setActiveReservation(null);
+      // Refresh status
+      loadCourtStatus(selectedCourt);
+      loadCourtUsageStatus();
+    } catch (error: any) {
+      console.error("Error taking court:", error);
+      setError(error.message || "Failed to take court");
     }
-    return { status: "Open", time: null, color: "text-green-500" };
   };
 
-  // Start timer for a court (when "Take" button is clicked)
-  const startCourtTimer = () => {
-    // Don't allow taking a court if user already has a reservation OR any court is already being used
-    if (hasActiveReservation() || hasActiveCourtUsage()) {
-      return;
-    }
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
-    // Clear any existing reservation when taking the court immediately
-    setActiveReservation(null);
-
-    // Calculate time until next available slot
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-    // Find the next time slot
-    let nextSlotMinutes = null;
-    for (const timeStr of availableTimes) {
-      // Parse time string (e.g., "2:30 pm")
-      const [time, period] = timeStr.split(" ");
-      const [hours, minutes] = time.split(":").map(Number);
-      let slotHours = hours;
-
-      // Convert to 24-hour format
-      if (period.toLowerCase() === "pm" && hours !== 12) {
-        slotHours += 12;
-      } else if (period.toLowerCase() === "am" && hours === 12) {
-        slotHours = 0;
-      }
-
-      const slotMinutes = slotHours * 60 + minutes;
-
-      // Find next slot after current time
-      if (slotMinutes > currentMinutes) {
-        nextSlotMinutes = slotMinutes;
-        break;
-      }
-    }
-
-    // Calculate minutes until next slot (default to 30 if no next slot found)
-    let minutesUntilNextSlot = 30;
-    if (nextSlotMinutes !== null) {
-      minutesUntilNextSlot = nextSlotMinutes - currentMinutes;
-    }
-
-    setTimers((prev) => ({
-      ...prev,
-      [selectedCourt]: minutesUntilNextSlot * 60, // Start at n minutes (converted to seconds)
-    }));
-  };
-
-  const courtStatus = getCourtStatus(selectedCourt);
+  if (!isAuthenticated) {
+    return <UnauthenticatedView />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
+      {/* User info header */}
+      <div className="bg-white px-6 pt-4 pb-2 flex justify-between items-center border-b">
+        <div className="text-sm text-gray-600">
+          Welcome back!{" "}
+          {error && <span className="text-red-500 ml-2">{error}</span>}
+        </div>
+        <LoginButton />
+      </div>
+
       <Header
         selectedCourt={selectedCourt}
         setSelectedCourt={setSelectedCourt}
         courtStatus={courtStatus}
         onTakeCourt={startCourtTimer}
         hasActiveReservation={hasActiveReservation()}
-        hasActiveCourtUsage={hasActiveCourtUsage()}
+        hasActiveCourtUsage={hasActiveCourtUsage}
       />
 
       <AvailableTimes
@@ -173,5 +169,13 @@ export default function App() {
 
       <BottomNavigation />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
