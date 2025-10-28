@@ -290,6 +290,51 @@ app.get('/api/reservations', authenticateToken, async (req, res) => {
   }
 });
 
+// Get reservations for a specific court and time slot
+app.get('/api/reservations/check', authenticateToken, async (req, res) => {
+  try {
+    const { courtId, timeSlot } = req.query;
+    
+    if (!courtId || !timeSlot) {
+      return res.status(400).json({ error: 'Court ID and time slot are required' });
+    }
+    
+    const reservation = await database.get(
+      `SELECT r.*, u.name as user_name 
+       FROM reservations r
+       JOIN users u ON r.user_id = u.id
+       WHERE r.court_id = ? AND r.time_slot = ? AND r.status = 'reserved'`,
+      [courtId, timeSlot]
+    );
+    
+    res.json({ 
+      isReserved: !!reservation,
+      reservation: reservation || null,
+      isOwnReservation: reservation ? reservation.user_id === req.user.userId : false
+    });
+  } catch (error) {
+    console.error('Error checking reservation:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all current reservations for the UI (to show which slots are taken)
+app.get('/api/reservations/all', authenticateToken, async (req, res) => {
+  try {
+    const reservations = await database.all(
+      `SELECT r.court_id, r.time_slot, r.user_id, u.name as user_name
+       FROM reservations r
+       JOIN users u ON r.user_id = u.id
+       WHERE r.status = 'reserved'`
+    );
+    
+    res.json({ reservations });
+  } catch (error) {
+    console.error('Error fetching all reservations:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.post('/api/reservations', authenticateToken, async (req, res) => {
   try {
     const { courtId, timeSlot } = req.body;
@@ -297,16 +342,6 @@ app.post('/api/reservations', authenticateToken, async (req, res) => {
     
     if (!courtId || !timeSlot) {
       return res.status(400).json({ error: 'Court ID and time slot are required' });
-    }
-    
-    // Check if user already has a reservation
-    const existingReservation = await database.get(
-      `SELECT * FROM reservations WHERE user_id = ? AND status = 'reserved'`,
-      [userId]
-    );
-    
-    if (existingReservation) {
-      return res.status(400).json({ error: 'You already have an active reservation' });
     }
     
     // Check if user is currently using any court

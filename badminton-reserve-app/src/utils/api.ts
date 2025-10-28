@@ -78,6 +78,30 @@ export const api = {
     return response.json();
   },
 
+  getAllReservations: async () => {
+    const response = await fetch(`${API_BASE}/reservations/all`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch all reservations: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
+  checkReservation: async (courtId: number, timeSlot: string) => {
+    const response = await fetch(`${API_BASE}/reservations/check?courtId=${courtId}&timeSlot=${encodeURIComponent(timeSlot)}`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to check reservation: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
   makeReservation: async (courtId: number, timeSlot: string) => {
     const response = await fetch(`${API_BASE}/reservations`, {
       method: 'POST',

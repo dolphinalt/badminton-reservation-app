@@ -8,12 +8,10 @@ import UnauthenticatedView from "./components/UnauthenticatedView";
 import { api } from "./utils/api";
 
 function AppContent() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   const [selectedCourt, setSelectedCourt] = useState(1);
-  const [activeReservation, setActiveReservation] = useState<{
-    court: number;
-    time: string;
-  } | null>(null);
+  const [userReservations, setUserReservations] = useState<any[]>([]);
+  const [allReservations, setAllReservations] = useState<any[]>([]);
   const [hasActiveCourtUsage, setHasActiveCourtUsage] = useState(false);
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [courtStatus, setCourtStatus] = useState({
@@ -29,6 +27,8 @@ function AppContent() {
       loadTimeSlots();
       loadCourtUsageStatus();
       loadCourtStatus(selectedCourt);
+      loadUserReservations();
+      loadAllReservations();
     }
   }, [isAuthenticated, selectedCourt]);
 
@@ -39,7 +39,9 @@ function AppContent() {
     const interval = setInterval(() => {
       loadCourtStatus(selectedCourt);
       loadCourtUsageStatus();
-    }, 5000); // Refresh every 5 seconds
+      loadAllReservations();
+      loadUserReservations(); // Also refresh user reservations to update activeReservation for selected court
+    }, 1000); // Refresh every second
 
     return () => clearInterval(interval);
   }, [isAuthenticated, selectedCourt]);
@@ -76,28 +78,83 @@ function AppContent() {
     }
   };
 
+  const loadUserReservations = async () => {
+    try {
+      const data = await api.getReservations();
+      setUserReservations(data.reservations || []);
+    } catch (error) {
+      console.error("Error loading user reservations:", error);
+      setUserReservations([]);
+    }
+  };
+
+  const loadAllReservations = async () => {
+    try {
+      const data = await api.getAllReservations();
+      setAllReservations(data.reservations || []);
+    } catch (error) {
+      console.error("Error loading all reservations:", error);
+      setAllReservations([]);
+    }
+  };
+
   const handleReserve = async (time: string) => {
     try {
       setError(null);
-      await api.makeReservation(selectedCourt, time);
-      setActiveReservation({ court: selectedCourt, time });
-      // Refresh status
+
+      // If this time slot is already reserved by the current user, cancel it instead
+      if (isReserved(time)) {
+        const reservation = userReservations.find(
+          (res) =>
+            res.status === "reserved" &&
+            res.court_id === selectedCourt &&
+            res.time_slot === time
+        );
+        if (reservation) {
+          await api.cancelReservation(reservation.id);
+        }
+      } else {
+        // Make a new reservation
+        await api.makeReservation(selectedCourt, time);
+      }
+
+      // Refresh reservations and status
+      loadUserReservations();
+      loadAllReservations();
       loadCourtUsageStatus();
     } catch (error: any) {
-      console.error("Error making reservation:", error);
-      setError(error.message || "Failed to make reservation");
+      console.error("Error handling reservation:", error);
+      setError(error.message || "Failed to handle reservation");
     }
   };
 
   const isReserved = (time: string) => {
-    return (
-      activeReservation?.court === selectedCourt &&
-      activeReservation?.time === time
+    if (!user) return false;
+
+    // Check if the current user has a reservation for this court and time
+    return userReservations.some(
+      (res: any) =>
+        res.court_id === selectedCourt &&
+        res.time_slot === time &&
+        res.status === "reserved"
+    );
+  };
+
+  const isReservedByOthers = (time: string) => {
+    if (!user) return false;
+
+    return allReservations.some(
+      (res: any) =>
+        res.court_id === selectedCourt &&
+        res.time_slot === time &&
+        res.user_id !== user.id // Check if the reservation is NOT by the current user
     );
   };
 
   const hasActiveReservation = () => {
-    return activeReservation !== null;
+    return userReservations.some(
+      (res) => res.court_id === selectedCourt && res.status === "reserved"
+    );
   };
 
   const canReserve = (time: string) => {
@@ -106,19 +163,28 @@ function AppContent() {
       return false;
     }
 
-    // Can reserve if: no active reservation OR this is the current reservation being changed
-    return !hasActiveReservation() || isReserved(time);
+    // Can't reserve if this slot is reserved by another user
+    if (isReservedByOthers(time)) {
+      return false;
+    }
+
+    // Can always click on your own reservations to cancel them
+    if (isReserved(time)) {
+      return true;
+    }
+
+    // Can reserve if this specific court/time slot is not already reserved
+    return true;
   };
 
   const startCourtTimer = async () => {
     try {
       setError(null);
       await api.takeCourt(selectedCourt);
-      // Clear any existing reservation
-      setActiveReservation(null);
-      // Refresh status
+      // Refresh status and reservations
       loadCourtStatus(selectedCourt);
       loadCourtUsageStatus();
+      loadUserReservations();
     } catch (error: any) {
       console.error("Error taking court:", error);
       setError(error.message || "Failed to take court");
@@ -163,6 +229,7 @@ function AppContent() {
       <AvailableTimes
         availableTimes={availableTimes}
         isReserved={isReserved}
+        isReservedByOthers={isReservedByOthers}
         handleReserve={handleReserve}
         canReserve={canReserve}
       />
