@@ -137,7 +137,7 @@ app.get('/api/courts', authenticateToken, async (req, res) => {
       if (activeSession) {
         status = 'in_use';
         const remaining = new Date(activeSession.expires_at) - new Date();
-        const remainingMinutes = Math.ceil(remaining / (1000 * 60));
+        const remainingMinutes = Math.max(0, Math.ceil(remaining / (1000 * 60)));
         time = `${remainingMinutes}m`;
         session_info = activeSession;
       }
@@ -181,7 +181,7 @@ app.get('/api/courts/:id/status', authenticateToken, async (req, res) => {
     if (activeSession) {
       status = 'In Use';
       const remaining = new Date(activeSession.expires_at) - new Date();
-      const remainingSeconds = Math.ceil(remaining / 1000);
+      const remainingSeconds = Math.max(0, Math.ceil(remaining / 1000));
       const minutes = Math.floor(remainingSeconds / 60);
       const seconds = remainingSeconds % 60;
       time = `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -234,9 +234,9 @@ app.post('/api/courts/:id/take', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Court is currently in use' });
     }
     
-    // Calculate session duration (30 minutes)
+    // Calculate session duration (1 minute)
     const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
+    const endTime = new Date(startTime.getTime() + 1 * 10 * 1000);
     
     // Create court session
     const result = await database.run(
@@ -461,6 +461,96 @@ app.get('/api/courts/user-usage-status', authenticateToken, async (req, res) => 
   }
 });
 
+// Release court (end session early)
+app.post('/api/courts/:id/release', authenticateToken, async (req, res) => {
+  try {
+    const courtId = parseInt(req.params.id);
+    const userId = req.user.userId;
+
+    // Check if user has an active session on this court
+    const activeSession = await database.get(
+      `SELECT * FROM court_sessions 
+       WHERE court_id = ? AND user_id = ? AND status = 'active' AND expires_at > datetime('now')`,
+      [courtId, userId]
+    );
+
+    if (!activeSession) {
+      return res.status(400).json({ error: 'No active session found for this court' });
+    }
+
+    // End the session
+    await database.run(
+      `UPDATE court_sessions 
+       SET status = 'completed' 
+       WHERE id = ?`,
+      [activeSession.id]
+    );
+
+    console.log(`User ${userId} released court ${courtId}`);
+
+    res.json({ 
+      message: 'Court released successfully',
+      court_id: courtId
+    });
+  } catch (error) {
+    console.error('Error releasing court:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Public endpoint for unauthenticated users to view court status
+app.get('/api/public/courts-status', async (req, res) => {
+  try {
+    const courts = await database.all('SELECT * FROM courts ORDER BY id');
+    const courtsWithStatus = [];
+
+    for (const court of courts) {
+      // Check if court is currently being used
+      const activeSession = await database.get(
+        `SELECT * FROM court_sessions 
+         WHERE court_id = ? AND status = 'active' AND expires_at > datetime('now')`,
+        [court.id]
+      );
+
+      // Count reservations for this court
+      const reservationCount = await database.get(
+        `SELECT COUNT(*) as count FROM reservations 
+         WHERE court_id = ? AND status = 'reserved'`,
+        [court.id]
+      );
+
+      let status, color;
+      if (activeSession) {
+        // Calculate remaining time
+        const expiresAt = new Date(activeSession.expires_at);
+        const now = new Date();
+        const remainingMs = expiresAt.getTime() - now.getTime();
+        const remainingMinutes = Math.max(0, Math.ceil(remainingMs / (1000 * 60)));
+        
+        status = `In Use (${remainingMinutes}m left)`;
+        color = 'text-red-500';
+      } else {
+        status = 'Available';
+        color = 'text-green-500';
+      }
+
+      courtsWithStatus.push({
+        id: court.id,
+        name: court.name,
+        status,
+        color,
+        reservationCount: reservationCount.count,
+        isInUse: !!activeSession
+      });
+    }
+
+    res.json({ courts: courtsWithStatus });
+  } catch (error) {
+    console.error('Error fetching public court status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
@@ -476,7 +566,30 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
+  
+  // Start the cleanup interval for expired sessions
+  startSessionCleanup();
 });
+
+// Cleanup expired sessions periodically
+function startSessionCleanup() {
+  // Run cleanup every 5 seconds for more responsive expiration
+  setInterval(async () => {
+    try {
+      const result = await database.run(
+        `UPDATE court_sessions 
+         SET status = 'completed' 
+         WHERE status = 'active' AND expires_at <= datetime('now')`
+      );
+      
+      if (result.changes > 0) {
+        console.log(`Auto-completed ${result.changes} court session(s) - timer reached 0`);
+      }
+    } catch (error) {
+      console.error('Error cleaning up expired sessions:', error);
+    }
+  }, 5000); // Check every 5 seconds for more responsive expiration
+}
 
 // Graceful shutdown
 process.on('SIGINT', async () => {

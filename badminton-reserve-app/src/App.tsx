@@ -84,6 +84,23 @@ function AppContent() {
   const loadCourtStatus = async (courtId: number) => {
     try {
       const data = await api.getCourtStatus(courtId);
+
+      // Check if court transitioned from "In Use" to "Available" (timer expired)
+      const wasInUse = courtStatus.status.includes("In Use");
+      const nowAvailable = data.status === "Open";
+
+      if (wasInUse && nowAvailable) {
+        console.log(
+          "🎯 Court session automatically completed - timer reached 0!"
+        );
+        // Force immediate refresh of all user states when court session auto-completes
+        setTimeout(() => {
+          loadUserCourtUsageStatus();
+          loadUserReservations();
+          loadCourtUsageStatus();
+        }, 100);
+      }
+
       setCourtStatus(data);
     } catch (error) {
       console.error("Error loading court status:", error);
@@ -214,6 +231,27 @@ function AppContent() {
     }
   };
 
+  const releaseCourtTimer = async () => {
+    try {
+      setError(null);
+      await api.releaseCourt(selectedCourt);
+      // Refresh status and reservations
+      loadCourtStatus(selectedCourt);
+      loadCourtUsageStatus();
+      loadUserCourtUsageStatus();
+      loadUserReservations();
+    } catch (error: any) {
+      console.error("Error releasing court:", error);
+      setError(error.message || "Failed to release court");
+    }
+  };
+
+  const isCurrentUserUsingThisCourt = () => {
+    // Check if the current court is in use and the user is using any court
+    // This is a simplified check - in a real app, we'd want to track which specific court the user is using
+    return courtStatus.status.includes("In Use") && isCurrentUserUsingAnyCourt;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -236,8 +274,10 @@ function AppContent() {
         setSelectedCourt={setSelectedCourt}
         courtStatus={courtStatus}
         onTakeCourt={startCourtTimer}
+        onReleaseCourt={releaseCourtTimer}
         hasActiveReservation={hasActiveReservation()}
         isCurrentUserUsingAnyCourt={isCurrentUserUsingAnyCourt}
+        isCurrentUserUsingThisCourt={isCurrentUserUsingThisCourt()}
       />
 
       <AvailableTimes

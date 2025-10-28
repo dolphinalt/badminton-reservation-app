@@ -14,6 +14,17 @@ const getAuthHeaders = (): Record<string, string> => {
 };
 
 export const api = {
+  // Public endpoints (no auth required)
+  getPublicCourtsStatus: async () => {
+    const response = await fetch(`${API_BASE}/public/courts-status`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch public courts status: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
   // Court-related endpoints
   getCourts: async () => {
     const response = await fetch(`${API_BASE}/courts`, {
@@ -48,6 +59,20 @@ export const api = {
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.error || `Failed to take court: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
+  releaseCourt: async (courtId: number) => {
+    const response = await fetch(`${API_BASE}/courts/${courtId}/release`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to release court: ${response.statusText}`);
     }
     
     return response.json();

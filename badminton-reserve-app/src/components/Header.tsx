@@ -11,8 +11,10 @@ interface HeaderProps {
     color: string;
   };
   onTakeCourt: () => void;
+  onReleaseCourt: () => void;
   hasActiveReservation: boolean;
   isCurrentUserUsingAnyCourt: boolean;
+  isCurrentUserUsingThisCourt: boolean;
 }
 
 export default function Header({
@@ -20,8 +22,10 @@ export default function Header({
   setSelectedCourt,
   courtStatus,
   onTakeCourt,
+  onReleaseCourt,
   hasActiveReservation,
   isCurrentUserUsingAnyCourt,
+  isCurrentUserUsingThisCourt,
 }: HeaderProps) {
   return (
     <div className="bg-white px-6 pt-8 pb-6">
@@ -35,8 +39,10 @@ export default function Header({
       <CourtStatus
         courtStatus={courtStatus}
         onTakeCourt={onTakeCourt}
+        onReleaseCourt={onReleaseCourt}
         hasActiveReservation={hasActiveReservation}
         isCurrentUserUsingAnyCourt={isCurrentUserUsingAnyCourt}
+        isCurrentUserUsingThisCourt={isCurrentUserUsingThisCourt}
       />
     </div>
   );
