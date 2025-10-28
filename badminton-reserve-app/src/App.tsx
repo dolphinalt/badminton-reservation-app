@@ -90,9 +90,6 @@ function AppContent() {
       const nowAvailable = data.status === "Open";
 
       if (wasInUse && nowAvailable) {
-        console.log(
-          "🎯 Court session automatically completed - timer reached 0!"
-        );
         // Force immediate refresh of all user states when court session auto-completes
         setTimeout(() => {
           loadUserCourtUsageStatus();

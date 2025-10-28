@@ -1,110 +1,148 @@
-# Badminton Court Reservation System
+# 🏸 Badminton Court Reservation App
 
-This is a full-stack application with Google OAuth authentication for managing badminton court reservations.
+> A modern, real-time court management application built for badminton facilities, providing seamless court reservations and session management with automatic timer controls.
 
-## Setup Instructions
+![Badminton Court Reservation App](./assets/img/badminton-reserve-app.jpeg "Badminton Court Reservation App")
 
-### 1. Google OAuth Setup
+## 🎯 Overview
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one
-3. Enable the Google+ API (or Google People API)
-4. Go to "Credentials" → "Create Credentials" → "OAuth 2.0 Client IDs"
-5. For "Application type", select "Web application"
-6. Add authorized redirect URIs:
-   - `http://localhost:3001/auth/google/callback` (for development)
-   - Add your production URL when deploying
+The Badminton Court Reservation System is a comprehensive web application designed to streamline court management for badminton facilities. It offers real-time court status tracking, automated session management, and a user-friendly interface for both players and facility administrators.
 
-### 2. Backend Configuration
+## ✨ Key Features
 
-1. Navigate to the `backend` directory
-2. Copy the example environment file and add your credentials:
-   ```bash
-   cd backend
-   cp .env.example .env
-   ```
-3. Edit the `.env` file with your Google OAuth credentials:
-   ```
-   GOOGLE_CLIENT_ID=your_google_client_id_from_step_1
-   GOOGLE_CLIENT_SECRET=your_google_client_secret_from_step_1
-   JWT_SECRET=create_a_long_random_string_here
-   SESSION_SECRET=create_another_long_random_string_here
-   PORT=3001
-   FRONTEND_URL=http://localhost:5173
-   ```
+### 🔐 Secure Authentication
 
-### 3. Running the Application
+- **Google OAuth 2.0 Integration**: Seamless sign-in with Google accounts
+- **JWT Token Security**: Secure session management and API authentication
+- **User Profile Management**: Automatic user registration and profile handling
 
-1. **Start the Backend:**
+### 🏟️ Real-Time Court Management
 
-   ```bash
-   cd backend
-   node server.js
-   ```
+- **Live Court Status**: Real-time updates showing court availability and usage
+- **Multi-Court Support**: Manage multiple courts simultaneously (Courts 1-3)
+- **Visual Status Indicators**: Color-coded system (Green: Available, Red: In Use)
+- **Timer Integration**: Precise countdown timers for active court sessions
 
-   The backend will run on http://localhost:3001
+### ⏰ Intelligent Session Control
 
-2. **Start the Frontend:**
-   ```bash
-   cd badminton-reserve-app
-   npm run dev
-   ```
-   The frontend will run on http://localhost:5173
+- **Automatic Timer Management**: 30-minute court sessions with real-time countdown
+- **Auto-Completion**: Courts automatically release when timer expires
+- **Manual Release Option**: Early session termination when needed
+- **Session History**: Track completed and expired sessions
 
-### 4. Testing the Application
+### 📅 Advanced Reservation System
 
-1. Open http://localhost:5173 in your browser
-2. You should see an unauthenticated view with a "Sign in with Google" button
-3. Click the button to test Google OAuth login
-4. After successful login, you should be able to:
-   - View and switch between courts
-   - Make reservations for future time slots
-   - Take courts for immediate use (30-minute sessions)
-   - See real-time updates of court status
+- **Time Slot Management**: Pre-defined time slots for organized scheduling
+- **Single Reservation Policy**: One active reservation per user to ensure fair access
+- **Conflict Prevention**: Automatic detection and prevention of booking conflicts
+- **Queue Visibility**: See how many players are waiting for each court
 
-## Features
+### 👥 Multi-User Experience
 
-- **Google OAuth Authentication:** Secure login with Google accounts
-- **Court Management:** 3 courts with real-time status updates
-- **Reservations:** Book future time slots (2:00 PM, 2:30 PM, 3:00 PM, 3:30 PM)
-- **Immediate Use:** Take courts for immediate 30-minute sessions
-- **User Management:** User-specific reservations and sessions
-- **Real-time Updates:** Court status updates every 5 seconds
-- **Conflict Prevention:** Prevents double-booking and conflicting reservations
+- **Concurrent User Support**: Multiple users can interact with the system simultaneously
+- **User-Specific Views**: Personalized dashboard showing individual reservations and permissions
+- **Cross-User Conflict Resolution**: Intelligent handling of competing reservation requests
+- **Real-Time Synchronization**: All users see updates within 1-5 seconds
 
-## API Endpoints
+### 📱 Responsive User Interface
 
-- `GET /api/courts` - Get all courts with status
-- `GET /api/courts/:id/status` - Get specific court status
-- `POST /api/courts/:id/take` - Take a court immediately
-- `GET /api/reservations` - Get user's reservations
-- `POST /api/reservations` - Make a new reservation
-- `DELETE /api/reservations/:id` - Cancel a reservation
-- `GET /api/time-slots` - Get available time slots
-- `GET /api/user` - Get current user info
+- **Modern Design**: Clean, intuitive interface built with React and Tailwind CSS
+- **Mobile-Friendly**: Responsive design optimized for all device sizes
+- **Real-Time Updates**: Live status updates without page refreshes
+- **Visual Feedback**: Clear indicators for all user actions and system states
 
-## Database Schema
+## 🏗️ System Architecture
 
-The application uses SQLite with the following tables:
+### Frontend Technology Stack
 
-- `users` - User information from Google OAuth
-- `courts` - Court definitions
-- `time_slots` - Available time slots
-- `reservations` - Future court reservations
-- `court_sessions` - Active court usage sessions
+- **React 18** with TypeScript for type-safe component development
+- **Vite** for fast development and optimized builds
+- **Tailwind CSS** for modern, responsive styling
+- **Real-time State Management** with React hooks and context
 
-## Security
+### Backend Infrastructure
 
-- JWT tokens for API authentication
-- Session-based OAuth flow
-- User-specific data isolation
-- Secure credential management
+- **Node.js** with Express.js for robust API services
+- **SQLite Database** for reliable data persistence
+- **Google OAuth 2.0** with Passport.js for secure authentication
+- **JWT Token Management** for stateless session handling
 
-## Next Steps
+### Database Schema
 
-1. **Set up Google OAuth credentials** following the instructions above
-2. **Test the authentication flow** by signing in with Google
-3. **Test court reservations** and immediate usage features
-4. **Deploy to production** with proper environment variables
+- **Users**: Profile management and authentication data
+- **Courts**: Court configuration and status tracking
+- **Reservations**: Time slot bookings and user assignments
+- **Court Sessions**: Active usage tracking with timer management
+- **Time Slots**: Configurable booking periods
 
-The application is now ready for use!
+## 🔄 Core Workflows
+
+### Court Reservation Process
+
+1. **Authentication**: User signs in via Google OAuth
+2. **Court Selection**: Choose from available courts (1-3)
+3. **Time Slot Booking**: Select preferred time from available slots
+4. **Conflict Check**: System validates availability and user eligibility
+5. **Confirmation**: Reservation confirmed with immediate UI updates
+
+### Court Usage Lifecycle
+
+1. **Court Activation**: User takes reserved court, starting 30-minute timer
+2. **Active Session**: Real-time countdown with manual release option
+3. **Timer Warnings**: Visual indicators when session nears expiration
+4. **Auto-Completion**: Automatic court release when timer reaches zero
+5. **Availability Reset**: Court returns to pool for new reservations
+
+### Multi-User Synchronization
+
+- **Live Status Broadcasting**: All connected users receive real-time updates
+- **Conflict Resolution**: Automatic handling of simultaneous booking attempts
+- **Fair Access Control**: Single reservation limit prevents monopolization
+- **Queue Management**: Transparent waiting system for popular time slots
+
+## 🛡️ Security & Reliability
+
+### Authentication Security
+
+- **OAuth 2.0 Standard**: Industry-standard authentication protocol
+- **Token Encryption**: Secure JWT tokens with expiration handling
+- **Session Management**: Automatic token refresh and logout protection
+
+### Data Protection
+
+- **User Isolation**: Each user only sees their own reservation data
+- **API Authentication**: All endpoints protected with token validation
+- **Input Validation**: Comprehensive request sanitization and validation
+
+### System Reliability
+
+- **Error Handling**: Graceful degradation with user-friendly error messages
+- **Automatic Recovery**: Session cleanup and state restoration
+- **Real-time Monitoring**: Comprehensive logging and status tracking
+
+## 📊 Public Features
+
+### Unauthenticated Access
+
+- **Live Court Status**: Public view of current court availability
+- **Queue Information**: See waiting lists without account requirement
+- **Auto-Refresh**: Status updates every 5 seconds for visitors
+- **Visual Indicators**: Color-coded availability with usage timers
+
+## 🔮 Advanced Capabilities
+
+### Smart Restrictions
+
+- **Usage-Based Blocking**: Users with active courts cannot make new reservations
+- **Visual Feedback**: Grayed-out options when restrictions apply
+- **Context-Aware UI**: Dynamic button states based on user permissions
+
+### Performance Optimization
+
+- **Efficient Updates**: Minimal API calls with intelligent caching
+- **Real-time Responsiveness**: Sub-second UI updates for critical actions
+- **Scalable Architecture**: Designed for facility expansion and increased usage
+
+---
+
+_Built with modern web technologies for reliable, real-time court management. Designed for badminton facilities seeking to optimize court utilization and enhance player experience._
