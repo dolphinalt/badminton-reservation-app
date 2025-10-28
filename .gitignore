@@ -1,0 +1,34 @@
+# Environment variables and secrets
+.env
+.env.local
+.env.development
+.env.production
+*.env
+
+# Backend specific
+backend/.env
+backend/badminton.db
+backend/node_modules/
+backend/logs/
+backend/*.log
+
+# Frontend specific  
+badminton-reserve-app/.env
+badminton-reserve-app/.env.local
+badminton-reserve-app/dist/
+badminton-reserve-app/node_modules/
+
+# General
+node_modules/
+*.log
+*.db
+*.sqlite
+.DS_Store
+.vscode/
+.idea/
+
+# Sensitive files
+config/secrets.json
+credentials.json
+*.key
+*.pem
