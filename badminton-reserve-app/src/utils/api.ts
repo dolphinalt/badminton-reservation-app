@@ -65,6 +65,18 @@ export const api = {
     return response.json();
   },
 
+  getUserCourtUsageStatus: async () => {
+    const response = await fetch(`${API_BASE}/courts/user-usage-status`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch user usage status: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
   // Reservation-related endpoints
   getReservations: async () => {
     const response = await fetch(`${API_BASE}/reservations`, {

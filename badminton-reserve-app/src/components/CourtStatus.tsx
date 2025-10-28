@@ -8,19 +8,18 @@ interface CourtStatusProps {
   };
   onTakeCourt: () => void;
   hasActiveReservation: boolean;
-  hasActiveCourtUsage: boolean;
+  isCurrentUserUsingAnyCourt: boolean;
 }
 
 export default function CourtStatus({
   courtStatus,
   onTakeCourt,
   hasActiveReservation,
-  hasActiveCourtUsage,
+  isCurrentUserUsingAnyCourt,
 }: CourtStatusProps) {
   const isCourtOpen = courtStatus.status === "Open";
   const canTakeCourt =
-    isCourtOpen && !hasActiveReservation && !hasActiveCourtUsage;
-
+    isCourtOpen && !hasActiveReservation && !isCurrentUserUsingAnyCourt;
   return (
     <div className="flex justify-between items-center">
       <span className={`text-2xl font-semibold ${courtStatus.color}`}>

@@ -12,7 +12,7 @@ interface HeaderProps {
   };
   onTakeCourt: () => void;
   hasActiveReservation: boolean;
-  hasActiveCourtUsage: boolean;
+  isCurrentUserUsingAnyCourt: boolean;
 }
 
 export default function Header({
@@ -21,7 +21,7 @@ export default function Header({
   courtStatus,
   onTakeCourt,
   hasActiveReservation,
-  hasActiveCourtUsage,
+  isCurrentUserUsingAnyCourt,
 }: HeaderProps) {
   return (
     <div className="bg-white px-6 pt-8 pb-6">
@@ -36,7 +36,7 @@ export default function Header({
         courtStatus={courtStatus}
         onTakeCourt={onTakeCourt}
         hasActiveReservation={hasActiveReservation}
-        hasActiveCourtUsage={hasActiveCourtUsage}
+        isCurrentUserUsingAnyCourt={isCurrentUserUsingAnyCourt}
       />
     </div>
   );

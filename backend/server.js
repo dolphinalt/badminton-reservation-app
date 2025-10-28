@@ -279,8 +279,9 @@ app.get('/api/reservations', authenticateToken, async (req, res) => {
        FROM reservations r
        JOIN courts c ON r.court_id = c.id
        JOIN users u ON r.user_id = u.id
-       WHERE r.status = 'reserved'
-       ORDER BY r.court_id, r.time_slot`
+       WHERE r.status = 'reserved' AND r.user_id = ?
+       ORDER BY r.court_id, r.time_slot`,
+      [req.user.userId]
     );
     
     res.json({ reservations });
@@ -342,6 +343,16 @@ app.post('/api/reservations', authenticateToken, async (req, res) => {
     
     if (!courtId || !timeSlot) {
       return res.status(400).json({ error: 'Court ID and time slot are required' });
+    }
+    
+    // Check if user already has an active reservation
+    const existingReservation = await database.get(
+      `SELECT * FROM reservations WHERE user_id = ? AND status = 'reserved'`,
+      [userId]
+    );
+    
+    if (existingReservation) {
+      return res.status(400).json({ error: 'You already have an active reservation. Cancel your current reservation to make a new one.' });
     }
     
     // Check if user is currently using any court
@@ -425,6 +436,27 @@ app.get('/api/courts/usage-status', authenticateToken, async (req, res) => {
     res.json({ hasActiveCourtUsage: hasActiveUsage });
   } catch (error) {
     console.error('Error checking court usage:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Check if current user is using any court
+app.get('/api/courts/user-usage-status', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const userActiveSession = await database.get(
+      `SELECT * FROM court_sessions WHERE user_id = ? AND status = 'active' AND expires_at > datetime('now')`,
+      [userId]
+    );
+    
+    const isCurrentUserUsingAnyCourt = !!userActiveSession;
+    
+    res.json({ 
+      isCurrentUserUsingAnyCourt,
+      activeSession: userActiveSession 
+    });
+  } catch (error) {
+    console.error('Error checking user court usage:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

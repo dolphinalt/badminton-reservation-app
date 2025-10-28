@@ -13,6 +13,8 @@ function AppContent() {
   const [userReservations, setUserReservations] = useState<any[]>([]);
   const [allReservations, setAllReservations] = useState<any[]>([]);
   const [hasActiveCourtUsage, setHasActiveCourtUsage] = useState(false);
+  const [isCurrentUserUsingAnyCourt, setIsCurrentUserUsingAnyCourt] =
+    useState(false);
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [courtStatus, setCourtStatus] = useState({
     status: "Open",
@@ -26,6 +28,7 @@ function AppContent() {
     if (isAuthenticated) {
       loadTimeSlots();
       loadCourtUsageStatus();
+      loadUserCourtUsageStatus();
       loadCourtStatus(selectedCourt);
       loadUserReservations();
       loadAllReservations();
@@ -39,6 +42,7 @@ function AppContent() {
     const interval = setInterval(() => {
       loadCourtStatus(selectedCourt);
       loadCourtUsageStatus();
+      loadUserCourtUsageStatus();
       loadAllReservations();
       loadUserReservations(); // Also refresh user reservations to update activeReservation for selected court
     }, 1000); // Refresh every second
@@ -65,6 +69,15 @@ function AppContent() {
       setHasActiveCourtUsage(data.hasActiveCourtUsage);
     } catch (error) {
       console.error("Error loading court usage status:", error);
+    }
+  };
+
+  const loadUserCourtUsageStatus = async () => {
+    try {
+      const data = await api.getUserCourtUsageStatus();
+      setIsCurrentUserUsingAnyCourt(data.isCurrentUserUsingAnyCourt);
+    } catch (error) {
+      console.error("Error loading user court usage status:", error);
     }
   };
 
@@ -122,6 +135,7 @@ function AppContent() {
       loadUserReservations();
       loadAllReservations();
       loadCourtUsageStatus();
+      loadUserCourtUsageStatus();
     } catch (error: any) {
       console.error("Error handling reservation:", error);
       setError(error.message || "Failed to handle reservation");
@@ -158,9 +172,9 @@ function AppContent() {
   };
 
   const canReserve = (time: string) => {
-    // Can't reserve if any court is being used
-    if (hasActiveCourtUsage) {
-      return false;
+    // Can always click on your own reservations to cancel them
+    if (isReserved(time)) {
+      return true;
     }
 
     // Can't reserve if this slot is reserved by another user
@@ -168,9 +182,17 @@ function AppContent() {
       return false;
     }
 
-    // Can always click on your own reservations to cancel them
-    if (isReserved(time)) {
-      return true;
+    // Can't make new reservations if user is currently using a court
+    if (isCurrentUserUsingAnyCourt) {
+      return false;
+    }
+
+    // Can't make new reservations if user already has an active reservation
+    const hasAnyReservation = userReservations.some(
+      (res) => res.status === "reserved"
+    );
+    if (hasAnyReservation) {
+      return false;
     }
 
     // Can reserve if this specific court/time slot is not already reserved
@@ -184,6 +206,7 @@ function AppContent() {
       // Refresh status and reservations
       loadCourtStatus(selectedCourt);
       loadCourtUsageStatus();
+      loadUserCourtUsageStatus();
       loadUserReservations();
     } catch (error: any) {
       console.error("Error taking court:", error);
@@ -208,22 +231,13 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      {/* User info header */}
-      <div className="bg-white px-6 pt-4 pb-2 flex justify-between items-center border-b">
-        <div className="text-sm text-gray-600">
-          Welcome back!{" "}
-          {error && <span className="text-red-500 ml-2">{error}</span>}
-        </div>
-        <LoginButton />
-      </div>
-
       <Header
         selectedCourt={selectedCourt}
         setSelectedCourt={setSelectedCourt}
         courtStatus={courtStatus}
         onTakeCourt={startCourtTimer}
         hasActiveReservation={hasActiveReservation()}
-        hasActiveCourtUsage={hasActiveCourtUsage}
+        isCurrentUserUsingAnyCourt={isCurrentUserUsingAnyCourt}
       />
 
       <AvailableTimes
