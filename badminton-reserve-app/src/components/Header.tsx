@@ -1,6 +1,6 @@
-import React from 'react';
-import CourtTabs from './CourtTabs.tsx';
-import CourtStatus from './CourtStatus.tsx';
+import React from "react";
+import CourtTabs from "./CourtTabs.tsx";
+import CourtStatus from "./CourtStatus.tsx";
 
 interface HeaderProps {
   selectedCourt: number;
@@ -12,22 +12,31 @@ interface HeaderProps {
   };
   onTakeCourt: () => void;
   hasActiveReservation: boolean;
+  hasActiveCourtUsage: boolean;
 }
 
-export default function Header({ selectedCourt, setSelectedCourt, courtStatus, onTakeCourt, hasActiveReservation }: HeaderProps) {
+export default function Header({
+  selectedCourt,
+  setSelectedCourt,
+  courtStatus,
+  onTakeCourt,
+  hasActiveReservation,
+  hasActiveCourtUsage,
+}: HeaderProps) {
   return (
     <div className="bg-white px-6 pt-8 pb-6">
       <h1 className="text-4xl font-bold text-gray-900 mb-8">Badminton</h1>
-      
-      <CourtTabs 
+
+      <CourtTabs
         selectedCourt={selectedCourt}
         setSelectedCourt={setSelectedCourt}
       />
-      
-      <CourtStatus 
-        courtStatus={courtStatus} 
+
+      <CourtStatus
+        courtStatus={courtStatus}
         onTakeCourt={onTakeCourt}
         hasActiveReservation={hasActiveReservation}
+        hasActiveCourtUsage={hasActiveCourtUsage}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 interface CourtStatusProps {
   courtStatus: {
@@ -8,12 +8,19 @@ interface CourtStatusProps {
   };
   onTakeCourt: () => void;
   hasActiveReservation: boolean;
+  hasActiveCourtUsage: boolean;
 }
 
-export default function CourtStatus({ courtStatus, onTakeCourt, hasActiveReservation }: CourtStatusProps) {
-  const isCourtOpen = courtStatus.status === 'Open';
-  const canTakeCourt = isCourtOpen && !hasActiveReservation;
-  
+export default function CourtStatus({
+  courtStatus,
+  onTakeCourt,
+  hasActiveReservation,
+  hasActiveCourtUsage,
+}: CourtStatusProps) {
+  const isCourtOpen = courtStatus.status === "Open";
+  const canTakeCourt =
+    isCourtOpen && !hasActiveReservation && !hasActiveCourtUsage;
+
   return (
     <div className="flex justify-between items-center">
       <span className={`text-2xl font-semibold ${courtStatus.color}`}>
@@ -25,16 +32,16 @@ export default function CourtStatus({ courtStatus, onTakeCourt, hasActiveReserva
         </span>
       )}
       {isCourtOpen && (
-        <button 
+        <button
           onClick={canTakeCourt ? onTakeCourt : undefined}
           disabled={!canTakeCourt}
           className={`px-6 py-2 border-2 rounded-full font-medium transition-colors ${
             canTakeCourt
-              ? 'border-teal-600 text-teal-600 hover:bg-teal-50 cursor-pointer'
-              : 'border-gray-300 text-gray-400 bg-gray-100 cursor-not-allowed'
+              ? "border-teal-600 text-teal-600 hover:bg-teal-50 cursor-pointer"
+              : "border-gray-300 text-gray-400 bg-gray-100 cursor-not-allowed"
           }`}
         >
-          {canTakeCourt ? 'Take' : 'Take'}
+          {canTakeCourt ? "Take" : "Take"}
         </button>
       )}
     </div>

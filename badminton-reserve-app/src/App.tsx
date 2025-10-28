@@ -103,8 +103,8 @@ export default function App() {
 
   // Start timer for a court (when "Take" button is clicked)
   const startCourtTimer = () => {
-    // Don't allow taking a court if user already has a reservation
-    if (hasActiveReservation()) {
+    // Don't allow taking a court if user already has a reservation OR any court is already being used
+    if (hasActiveReservation() || hasActiveCourtUsage()) {
       return;
     }
 
@@ -161,6 +161,7 @@ export default function App() {
         courtStatus={courtStatus}
         onTakeCourt={startCourtTimer}
         hasActiveReservation={hasActiveReservation()}
+        hasActiveCourtUsage={hasActiveCourtUsage()}
       />
 
       <AvailableTimes
