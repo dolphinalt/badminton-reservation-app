@@ -1,4 +1,4 @@
-import React from "react";
+
 import CourtTabs from "./CourtTabs.tsx";
 import CourtStatus from "./CourtStatus.tsx";
 

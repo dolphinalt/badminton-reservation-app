@@ -20,7 +20,7 @@ setupAuth(database);
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: [process.env.FRONTEND_URL || 'http://localhost:5173', 'http://localhost:5174'],
   credentials: true
 }));
 
@@ -65,7 +65,7 @@ app.get('/auth/google/callback',
     try {
       // Generate JWT token
       const token = jwt.sign(
-        { userId: req.user.id, email: req.user.email },
+        { userId: req.user.id, email: req.user.email, name: req.user.name },
         process.env.JWT_SECRET,
         { expiresIn: '7d' }
       );
@@ -126,7 +126,7 @@ app.get('/api/courts', authenticateToken, async (req, res) => {
         `SELECT r.*, u.name as user_name FROM reservations r
          JOIN users u ON r.user_id = u.id
          WHERE r.court_id = ? AND r.status = 'reserved'
-         ORDER BY r.time_slot ASC
+         ORDER BY r.queue_position ASC
          LIMIT 1`,
         [court.id]
       );
@@ -262,29 +262,41 @@ app.post('/api/courts/:id/take', authenticateToken, async (req, res) => {
 });
 
 // Time slots routes
-app.get('/api/time-slots', authenticateToken, async (req, res) => {
+app.get('/api/queue', authenticateToken, async (req, res) => {
   try {
-    const timeSlots = await database.all(`SELECT * FROM time_slots ORDER BY time`);
-    let availableTimes = {}
-    for (const time of timeSlots) {
-        if (isTimeNotPassed(time.time)) {
-            // If time is not passed, add to available times
-            availableTimes.push(time.time);
-        }
-    }
-    res.json({ availableTimes });
+    // Get all reservations ordered by court and queue position
+    const reservations = await database.all(
+      `SELECT r.*, c.name as court_name, u.name as user_name
+       FROM reservations r
+       JOIN courts c ON r.court_id = c.id
+       JOIN users u ON r.user_id = u.id
+       WHERE r.status = 'reserved'
+       ORDER BY r.court_id, r.queue_position`
+    );
+    
+    // Group by court
+    const queueByCourtId = {};
+    reservations.forEach(reservation => {
+      if (!queueByCourtId[reservation.court_id]) {
+        queueByCourtId[reservation.court_id] = [];
+      }
+      queueByCourtId[reservation.court_id].push(reservation);
+    });
+    
+    res.json({ queueByCourtId });
   } catch (error) {
-    console.error('Error fetching time slots:', error);
+    console.error('Error fetching queue:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Gym open route
+// Gym status route - always open for queue system
 app.get('/api/gym/open-status', async (req, res) => {
   try {
-    const openTime = await database.get(`SELECT time FROM time_slots ORDER BY id ASC LIMIT 1`);
-    const closeTime = await database.get(`SELECT time FROM time_slots ORDER BY id DESC LIMIT 1`);
-    res.json({ openTime, closeTime });
+    res.json({ 
+      isOpen: true,
+      message: "Queue system is always available" 
+    });
   } catch (error) {
     console.error('Error fetching gym open status:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -300,7 +312,7 @@ app.get('/api/reservations', authenticateToken, async (req, res) => {
        JOIN courts c ON r.court_id = c.id
        JOIN users u ON r.user_id = u.id
        WHERE r.status = 'reserved' AND r.user_id = ?
-       ORDER BY r.court_id, r.time_slot`,
+       ORDER BY r.court_id, r.queue_position`,
       [req.user.userId]
     );
     
@@ -314,24 +326,23 @@ app.get('/api/reservations', authenticateToken, async (req, res) => {
 // Get reservations for a specific court and time slot
 app.get('/api/reservations/check', authenticateToken, async (req, res) => {
   try {
-    const { courtId, timeSlot } = req.query;
+    const { courtId } = req.query;
     
-    if (!courtId || !timeSlot) {
-      return res.status(400).json({ error: 'Court ID and time slot are required' });
+    if (!courtId) {
+      return res.status(400).json({ error: 'Court ID is required' });
     }
     
-    const reservation = await database.get(
+    const userReservation = await database.get(
       `SELECT r.*, u.name as user_name 
        FROM reservations r
        JOIN users u ON r.user_id = u.id
-       WHERE r.court_id = ? AND r.time_slot = ? AND r.status = 'reserved'`,
-      [courtId, timeSlot]
+       WHERE r.court_id = ? AND r.user_id = ? AND r.status = 'reserved'`,
+      [courtId, req.user.userId]
     );
     
     res.json({ 
-      isReserved: !!reservation,
-      reservation: reservation || null,
-      isOwnReservation: reservation ? reservation.user_id === req.user.userId : false
+      hasReservation: !!userReservation,
+      reservation: userReservation || null
     });
   } catch (error) {
     console.error('Error checking reservation:', error);
@@ -343,10 +354,11 @@ app.get('/api/reservations/check', authenticateToken, async (req, res) => {
 app.get('/api/reservations/all', authenticateToken, async (req, res) => {
   try {
     const reservations = await database.all(
-      `SELECT r.court_id, r.time_slot, r.user_id, u.name as user_name
+      `SELECT r.court_id, r.queue_position, r.user_id, r.user_name, u.name as user_name
        FROM reservations r
        JOIN users u ON r.user_id = u.id
-       WHERE r.status = 'reserved'`
+       WHERE r.status = 'reserved'
+       ORDER BY r.court_id, r.queue_position`
     );
     
     res.json({ reservations });
@@ -358,11 +370,21 @@ app.get('/api/reservations/all', authenticateToken, async (req, res) => {
 
 app.post('/api/reservations', authenticateToken, async (req, res) => {
   try {
-    const { courtId, timeSlot } = req.body;
+    const { courtId } = req.body;
     const userId = req.user.userId;
+    let userName = req.user.name;
     
-    if (!courtId || !timeSlot) {
-      return res.status(400).json({ error: 'Court ID and time slot are required' });
+    // If name is not in JWT, get it from database
+    if (!userName) {
+      const user = await database.get(
+        `SELECT name FROM users WHERE id = ?`,
+        [userId]
+      );
+      userName = user?.name || 'Unknown User';
+    }
+    
+    if (!courtId) {
+      return res.status(400).json({ error: 'Court ID is required' });
     }
     
     // Check if user already has an active reservation
@@ -385,28 +407,27 @@ app.post('/api/reservations', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Cannot make reservation while using a court' });
     }
     
-    // Check if time slot is already reserved for this court
-    const existingSlotReservation = await database.get(
-      `SELECT * FROM reservations WHERE court_id = ? AND time_slot = ? AND status = 'reserved'`,
-      [courtId, timeSlot]
+    // Get the next queue position for this court
+    const lastPosition = await database.get(
+      `SELECT MAX(queue_position) as max_pos FROM reservations WHERE court_id = ? AND status = 'reserved'`,
+      [courtId]
     );
     
-    if (existingSlotReservation) {
-      return res.status(400).json({ error: 'This time slot is already reserved' });
-    }
+    const nextPosition = (lastPosition?.max_pos || 0) + 1;
     
     // Create reservation
     const result = await database.run(
-      `INSERT INTO reservations (court_id, time_slot, user_id) VALUES (?, ?, ?)`,
-      [courtId, timeSlot, userId]
+      `INSERT INTO reservations (court_id, user_id, user_name, queue_position) VALUES (?, ?, ?, ?)`,
+      [courtId, userId, userName, nextPosition]
     );
     
     res.json({
       reservation: {
         id: result.id,
         court_id: parseInt(courtId),
-        time_slot: timeSlot,
+        queue_position: nextPosition,
         user_id: userId,
+        user_name: userName,
         status: 'reserved'
       }
     });

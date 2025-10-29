@@ -127,8 +127,8 @@ export const api = {
     return response.json();
   },
 
-  checkReservation: async (courtId: number, timeSlot: string) => {
-    const response = await fetch(`${API_BASE}/reservations/check?courtId=${courtId}&timeSlot=${encodeURIComponent(timeSlot)}`, {
+  checkReservation: async (courtId: number) => {
+    const response = await fetch(`${API_BASE}/reservations/check?courtId=${courtId}`, {
       headers: getAuthHeaders()
     });
     
@@ -139,11 +139,11 @@ export const api = {
     return response.json();
   },
 
-  makeReservation: async (courtId: number, timeSlot: string) => {
+  makeReservation: async (courtId: number) => {
     const response = await fetch(`${API_BASE}/reservations`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ courtId, timeSlot })
+      body: JSON.stringify({ courtId })
     });
     
     if (!response.ok) {
@@ -168,14 +168,14 @@ export const api = {
     return response.json();
   },
 
-  // Time slots
-  getTimeSlots: async () => {
-    const response = await fetch(`${API_BASE}/time-slots`, {
+  // Queue endpoint
+  getQueue: async () => {
+    const response = await fetch(`${API_BASE}/queue`, {
       headers: getAuthHeaders()
     });
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch time slots: ${response.statusText}`);
+      throw new Error(`Failed to fetch queue: ${response.statusText}`);
     }
     
     return response.json();

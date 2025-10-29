@@ -1,4 +1,4 @@
-import React from 'react';
+
 import NavItem from './NavItem.tsx';
 
 export default function BottomNavigation() {

@@ -3,7 +3,6 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Header from "./components/Header";
 import AvailableTimes from "./components/AvailableTimes";
 import BottomNavigation from "./components/BottomNavigation";
-import LoginButton from "./components/LoginButton";
 import UnauthenticatedView from "./components/UnauthenticatedView";
 import { api } from "./utils/api";
 
@@ -15,7 +14,7 @@ function AppContent() {
   const [hasActiveCourtUsage, setHasActiveCourtUsage] = useState(false);
   const [isCurrentUserUsingAnyCourt, setIsCurrentUserUsingAnyCourt] =
     useState(false);
-  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+  const [queueData, setQueueData] = useState<any>({});
   const [courtStatus, setCourtStatus] = useState({
     status: "Open",
     time: null,
@@ -23,10 +22,13 @@ function AppContent() {
   });
   const [error, setError] = useState<string | null>(null);
 
+  // Temporarily suppress unused variable warnings - these will be used in queue system
+  console.log({ allReservations, hasActiveCourtUsage, error });
+
   // Load initial data
   useEffect(() => {
     if (isAuthenticated) {
-      loadTimeSlots();
+      loadQueue();
       loadCourtUsageStatus();
       loadUserCourtUsageStatus();
       loadCourtStatus(selectedCourt);
@@ -45,21 +47,21 @@ function AppContent() {
       loadUserCourtUsageStatus();
       loadAllReservations();
       loadUserReservations(); // Also refresh user reservations to update activeReservation for selected court
+      loadQueue(); // Refresh queue data
     }, 1000); // Refresh every second
 
     return () => clearInterval(interval);
   }, [isAuthenticated, selectedCourt]);
 
-  const loadTimeSlots = async () => {
+  const loadQueue = async () => {
     try {
       setError(null);
-      const data = await api.getTimeSlots();
-      setAvailableTimes(data.timeSlots.map((slot: any) => slot.time));
+      const data = await api.getQueue();
+      setQueueData(data.queueByCourtId || {});
     } catch (error: any) {
-      console.error("Error loading time slots:", error);
-      setError("Failed to load available times");
-      // Set default times as fallback
-      setAvailableTimes([""]);
+      console.error("Error loading queue:", error);
+      setError("Failed to load queue");
+      setQueueData({});
     }
   };
 
@@ -125,58 +127,31 @@ function AppContent() {
     }
   };
 
-  const handleReserve = async (time: string) => {
+  const handleReserve = async (courtId: number) => {
     try {
       setError(null);
 
-      // If this time slot is already reserved by the current user, cancel it instead
-      if (isReserved(time)) {
-        const reservation = userReservations.find(
-          (res) =>
-            res.status === "reserved" &&
-            res.court_id === selectedCourt &&
-            res.time_slot === time
-        );
-        if (reservation) {
-          await api.cancelReservation(reservation.id);
-        }
+      // Check if user already has a reservation for this court
+      const existingReservation = userReservations.find(
+        (res) => res.status === "reserved" && res.court_id === courtId
+      );
+
+      if (existingReservation) {
+        // Cancel existing reservation
+        await api.cancelReservation(existingReservation.id);
       } else {
-        // Make a new reservation
-        await api.makeReservation(selectedCourt, time);
+        // Make a new reservation (join queue)
+        await api.makeReservation(courtId);
       }
 
-      // Refresh reservations and status
+      // Refresh data
+      loadQueue();
       loadUserReservations();
       loadAllReservations();
-      loadCourtUsageStatus();
-      loadUserCourtUsageStatus();
     } catch (error: any) {
-      console.error("Error handling reservation:", error);
-      setError(error.message || "Failed to handle reservation");
+      console.error("Error with reservation:", error);
+      setError(error.message || "Failed to update reservation");
     }
-  };
-
-  const isReserved = (time: string) => {
-    if (!user) return false;
-
-    // Check if the current user has a reservation for this court and time
-    return userReservations.some(
-      (res: any) =>
-        res.court_id === selectedCourt &&
-        res.time_slot === time &&
-        res.status === "reserved"
-    );
-  };
-
-  const isReservedByOthers = (time: string) => {
-    if (!user) return false;
-
-    return allReservations.some(
-      (res: any) =>
-        res.court_id === selectedCourt &&
-        res.time_slot === time &&
-        res.user_id !== user.id // Check if the reservation is NOT by the current user
-    );
   };
 
   const hasActiveReservation = () => {
@@ -185,18 +160,8 @@ function AppContent() {
     );
   };
 
-  const canReserve = (time: string) => {
-    // Can always click on your own reservations to cancel them
-    if (isReserved(time)) {
-      return true;
-    }
-
-    // Can't reserve if this slot is reserved by another user
-    if (isReservedByOthers(time)) {
-      return false;
-    }
-
-    // Can't make new reservations if user is currently using a court
+  const canReserve = () => {
+    // Can't make reservations if user is currently using a court
     if (isCurrentUserUsingAnyCourt) {
       return false;
     }
@@ -209,8 +174,22 @@ function AppContent() {
       return false;
     }
 
-    // Can reserve if this specific court/time slot is not already reserved
     return true;
+  };
+
+  const handleCancel = async (reservationId: number) => {
+    try {
+      setError(null);
+      await api.cancelReservation(reservationId);
+
+      // Refresh data
+      loadQueue();
+      loadUserReservations();
+      loadAllReservations();
+    } catch (error: any) {
+      console.error("Error cancelling reservation:", error);
+      setError(error.message || "Failed to cancel reservation");
+    }
   };
 
   const startCourtTimer = async () => {
@@ -278,11 +257,12 @@ function AppContent() {
       />
 
       <AvailableTimes
-        availableTimes={availableTimes}
-        isReserved={isReserved}
-        isReservedByOthers={isReservedByOthers}
+        selectedCourt={selectedCourt}
+        queueData={queueData}
         handleReserve={handleReserve}
+        handleCancel={handleCancel}
         canReserve={canReserve}
+        user={user}
       />
 
       <BottomNavigation />

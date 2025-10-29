@@ -1,8 +1,5 @@
-const { genTimes } = require('./utils/utils.js');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-
-console.log('genTimes function:', genTimes);
 
 class Database {
   constructor() {
@@ -36,24 +33,24 @@ class Database {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`);
 
-      // Create time_slots table
-      this.db.run(`CREATE TABLE IF NOT EXISTS time_slots (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        time TEXT NOT NULL UNIQUE,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )`);
+      // Drop existing reservations table to ensure clean schema
+      this.db.run(`DROP TABLE IF EXISTS reservations`);
+      
+      // Remove time_slots table as we no longer need it for queue system
+      this.db.run(`DROP TABLE IF EXISTS time_slots`);
 
-      // Create reservations table
-      this.db.run(`CREATE TABLE IF NOT EXISTS reservations (
+      // Create reservations table (queue system)
+      this.db.run(`CREATE TABLE reservations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         court_id INTEGER NOT NULL,
-        time_slot TEXT NOT NULL,
         user_id INTEGER NOT NULL,
+        user_name TEXT NOT NULL,
+        queue_position INTEGER NOT NULL,
         status TEXT DEFAULT 'reserved',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        expires_at DATETIME,
-        FOREIGN KEY(court_id) REFERENCES courts(id),
-        FOREIGN KEY(user_id) REFERENCES users(id)
+        FOREIGN KEY (court_id) REFERENCES courts(id),
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        UNIQUE(court_id, queue_position)
       )`);
 
       // Create court_sessions table
@@ -87,20 +84,6 @@ class Database {
         [court.id, court.name],
         (err) => {
           if (err) console.error('Error inserting court:', err);
-        }
-      );
-    });
-
-    // Insert time slots
-    const date = new Date();
-    const day = date.getDay(); // 0 (Sunday) to 6 (Saturday)
-    const timeSlots = [genTimes(495, 1425, 30), genTimes(780, 1080, 30), genTimes(600, 1020, 30), genTimes(780, 1080, 30), genTimes(600, 1020, 30), genTimes(600, 1020, 30), genTimes(840, 1380, 30)];
-    timeSlots[day].forEach(time => {
-      this.db.run(
-        `INSERT OR IGNORE INTO time_slots (time) VALUES (?)`,
-        [time],
-        (err) => {
-          if (err) console.error('Error inserting time slot:', err);
         }
       );
     });
