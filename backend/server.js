@@ -237,7 +237,7 @@ app.post('/api/courts/:id/take', authenticateToken, async (req, res) => {
     
     // Calculate session duration (1 minute)
     const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + 1 * 10 * 1000);
+    const endTime = new Date(startTime.getTime() + 1 * 60 * 1000);
     
     // Create court session
     const result = await database.run(
