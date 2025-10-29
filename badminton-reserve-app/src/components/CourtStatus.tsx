@@ -7,7 +7,6 @@ interface CourtStatusProps {
     color: string;
   };
   onTakeCourt: () => void;
-  onReleaseCourt: () => void;
   onAdvanceQueue: () => void;
   hasActiveReservation: boolean;
   hasAnyQueueReservation: boolean;
@@ -18,7 +17,6 @@ interface CourtStatusProps {
 export default function CourtStatus({
   courtStatus,
   onTakeCourt,
-  onReleaseCourt,
   onAdvanceQueue,
   hasActiveReservation,
   hasAnyQueueReservation,
@@ -26,14 +24,11 @@ export default function CourtStatus({
   isCurrentUserUsingThisCourt,
 }: CourtStatusProps) {
   const isCourtOpen = courtStatus.status === "Open";
-  const isCourtInUse = courtStatus.status.includes("In Use");
   const canTakeCourt =
     isCourtOpen &&
     !hasActiveReservation &&
     !hasAnyQueueReservation &&
     !isCurrentUserUsingAnyCourt;
-
-  const canReleaseCourt = isCourtInUse && isCurrentUserUsingThisCourt;
 
   // Automatically advance queue when timer reaches 0
   useEffect(() => {

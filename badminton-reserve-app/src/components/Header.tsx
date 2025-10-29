@@ -23,7 +23,6 @@ export default function Header({
   setSelectedCourt,
   courtStatus,
   onTakeCourt,
-  onReleaseCourt,
   onAdvanceQueue,
   hasActiveReservation,
   hasAnyQueueReservation,
@@ -42,7 +41,6 @@ export default function Header({
       <CourtStatus
         courtStatus={courtStatus}
         onTakeCourt={onTakeCourt}
-        onReleaseCourt={onReleaseCourt}
         onAdvanceQueue={onAdvanceQueue}
         hasActiveReservation={hasActiveReservation}
         hasAnyQueueReservation={hasAnyQueueReservation}
