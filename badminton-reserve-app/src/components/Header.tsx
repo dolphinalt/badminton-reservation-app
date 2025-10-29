@@ -1,4 +1,3 @@
-
 import CourtTabs from "./CourtTabs.tsx";
 import CourtStatus from "./CourtStatus.tsx";
 
@@ -13,6 +12,7 @@ interface HeaderProps {
   onTakeCourt: () => void;
   onReleaseCourt: () => void;
   hasActiveReservation: boolean;
+  hasAnyQueueReservation: boolean;
   isCurrentUserUsingAnyCourt: boolean;
   isCurrentUserUsingThisCourt: boolean;
 }
@@ -24,6 +24,7 @@ export default function Header({
   onTakeCourt,
   onReleaseCourt,
   hasActiveReservation,
+  hasAnyQueueReservation,
   isCurrentUserUsingAnyCourt,
   isCurrentUserUsingThisCourt,
 }: HeaderProps) {
@@ -41,6 +42,7 @@ export default function Header({
         onTakeCourt={onTakeCourt}
         onReleaseCourt={onReleaseCourt}
         hasActiveReservation={hasActiveReservation}
+        hasAnyQueueReservation={hasAnyQueueReservation}
         isCurrentUserUsingAnyCourt={isCurrentUserUsingAnyCourt}
         isCurrentUserUsingThisCourt={isCurrentUserUsingThisCourt}
       />

@@ -41,7 +41,7 @@ export default function TimeSlot({
           onClick={onCancel}
           className="px-4 py-2 rounded-full font-medium border-2 border-red-500 text-red-500 hover:bg-red-50 transition-all"
         >
-          Cancel
+          Leave
         </button>
       )}
     </div>

@@ -65,7 +65,7 @@ export default function UnauthenticatedView() {
   };
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+      <div className="max-w-md w-full bg-white rounded-lg p-8 text-center">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Badminton</h1>
           <h2 className="text-xl font-semibold text-gray-700 mb-4">

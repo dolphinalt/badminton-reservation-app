@@ -160,6 +160,10 @@ function AppContent() {
     );
   };
 
+  const hasAnyQueueReservation = () => {
+    return userReservations.some((res) => res.status === "reserved");
+  };
+
   const canReserve = () => {
     // Can't make reservations if user is currently using a court
     if (isCurrentUserUsingAnyCourt) {
@@ -252,6 +256,7 @@ function AppContent() {
         onTakeCourt={startCourtTimer}
         onReleaseCourt={releaseCourtTimer}
         hasActiveReservation={hasActiveReservation()}
+        hasAnyQueueReservation={hasAnyQueueReservation()}
         isCurrentUserUsingAnyCourt={isCurrentUserUsingAnyCourt}
         isCurrentUserUsingThisCourt={isCurrentUserUsingThisCourt()}
       />

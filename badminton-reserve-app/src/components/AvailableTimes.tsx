@@ -61,7 +61,7 @@ export default function AvailableTimes({
             ))}
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-gray-500 italic">
             <p>No one in queue. Be the first to join!</p>
           </div>
         )}

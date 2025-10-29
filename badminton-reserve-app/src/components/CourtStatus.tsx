@@ -9,6 +9,7 @@ interface CourtStatusProps {
   onTakeCourt: () => void;
   onReleaseCourt: () => void;
   hasActiveReservation: boolean;
+  hasAnyQueueReservation: boolean;
   isCurrentUserUsingAnyCourt: boolean;
   isCurrentUserUsingThisCourt: boolean;
 }
@@ -18,13 +19,17 @@ export default function CourtStatus({
   onTakeCourt,
   onReleaseCourt,
   hasActiveReservation,
+  hasAnyQueueReservation,
   isCurrentUserUsingAnyCourt,
   isCurrentUserUsingThisCourt,
 }: CourtStatusProps) {
   const isCourtOpen = courtStatus.status === "Open";
   const isCourtInUse = courtStatus.status.includes("In Use");
   const canTakeCourt =
-    isCourtOpen && !hasActiveReservation && !isCurrentUserUsingAnyCourt;
+    isCourtOpen &&
+    !hasActiveReservation &&
+    !hasAnyQueueReservation &&
+    !isCurrentUserUsingAnyCourt;
 
   const canReleaseCourt = isCourtInUse && isCurrentUserUsingThisCourt;
 
