@@ -46,13 +46,17 @@ export default function CourtStatus({
           {courtStatus.time}
         </span>
       )}
-
-      {canReleaseCourt && (
+      {isCourtOpen && (
         <button
-          onClick={onReleaseCourt}
-          className="px-6 py-2 border-2 border-red-600 text-red-600 rounded-full font-medium hover:bg-red-50 transition-colors"
+          onClick={canTakeCourt ? onTakeCourt : undefined}
+          disabled={!canTakeCourt}
+          className={`px-6 py-2 border-2 rounded-full font-medium transition-colors ${
+            canTakeCourt
+              ? "border-teal-600 text-teal-600 hover:bg-teal-50 cursor-pointer"
+              : "border-gray-300 text-gray-400 bg-gray-100 cursor-not-allowed"
+          }`}
         >
-          Release
+          {canTakeCourt ? "Take" : "Take"}
         </button>
       )}
     </div>

@@ -1,3 +1,4 @@
+const { isTimeNotPassed } = require('./utils/utils.js');
 const express = require('express');
 const session = require('express-session');
 const passport = require('passport');
@@ -264,9 +265,28 @@ app.post('/api/courts/:id/take', authenticateToken, async (req, res) => {
 app.get('/api/time-slots', authenticateToken, async (req, res) => {
   try {
     const timeSlots = await database.all(`SELECT * FROM time_slots ORDER BY time`);
-    res.json({ timeSlots });
+    let availableTimes = {}
+    for (const time of timeSlots) {
+        if (isTimeNotPassed(time.time)) {
+            // If time is not passed, add to available times
+            availableTimes.push(time.time);
+        }
+    }
+    res.json({ availableTimes });
   } catch (error) {
     console.error('Error fetching time slots:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Gym open route
+app.get('/api/gym/open-status', async (req, res) => {
+  try {
+    const openTime = await database.get(`SELECT time FROM time_slots ORDER BY id ASC LIMIT 1`);
+    const closeTime = await database.get(`SELECT time FROM time_slots ORDER BY id DESC LIMIT 1`);
+    res.json({ openTime, closeTime });
+  } catch (error) {
+    console.error('Error fetching gym open status:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -59,7 +59,7 @@ function AppContent() {
       console.error("Error loading time slots:", error);
       setError("Failed to load available times");
       // Set default times as fallback
-      setAvailableTimes(["2:00 pm", "2:30 pm", "3:00 pm", "3:30 pm"]);
+      setAvailableTimes([""]);
     }
   };
 

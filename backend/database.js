@@ -1,5 +1,8 @@
+const { genTimes } = require('./utils/utils.js');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+
+console.log('genTimes function:', genTimes);
 
 class Database {
   constructor() {
@@ -89,8 +92,10 @@ class Database {
     });
 
     // Insert time slots
-    const timeSlots = ['2:00 pm', '2:30 pm', '3:00 pm', '3:30 pm'];
-    timeSlots.forEach(time => {
+    const date = new Date();
+    const day = date.getDay(); // 0 (Sunday) to 6 (Saturday)
+    const timeSlots = [genTimes(495, 1425, 30), genTimes(780, 1080, 30), genTimes(600, 1020, 30), genTimes(780, 1080, 30), genTimes(600, 1020, 30), genTimes(600, 1020, 30), genTimes(840, 1380, 30)];
+    timeSlots[day].forEach(time => {
       this.db.run(
         `INSERT OR IGNORE INTO time_slots (time) VALUES (?)`,
         [time],
