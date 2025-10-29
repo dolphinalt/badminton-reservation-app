@@ -22,9 +22,6 @@ function AppContent() {
   });
   const [error, setError] = useState<string | null>(null);
 
-  // Temporarily suppress unused variable warnings - these will be used in queue system
-  console.log({ allReservations, hasActiveCourtUsage, error });
-
   // Load initial data
   useEffect(() => {
     if (isAuthenticated) {
@@ -226,6 +223,24 @@ function AppContent() {
     }
   };
 
+  const advanceQueueTimer = async () => {
+    try {
+      setError(null);
+      console.log(`Advancing queue for court ${selectedCourt}`);
+      await api.advanceQueue(selectedCourt);
+      // Refresh all data to reflect queue changes
+      loadCourtStatus(selectedCourt);
+      loadCourtUsageStatus();
+      loadUserCourtUsageStatus();
+      loadUserReservations();
+      loadQueue();
+      loadAllReservations();
+    } catch (error: any) {
+      console.error("Error advancing queue:", error);
+      setError(error.message || "Failed to advance queue");
+    }
+  };
+
   const isCurrentUserUsingThisCourt = () => {
     // Check if the current court is in use and the user is using any court
     // This is a simplified check - in a real app, we'd want to track which specific court the user is using
@@ -255,6 +270,7 @@ function AppContent() {
         courtStatus={courtStatus}
         onTakeCourt={startCourtTimer}
         onReleaseCourt={releaseCourtTimer}
+        onAdvanceQueue={advanceQueueTimer}
         hasActiveReservation={hasActiveReservation()}
         hasAnyQueueReservation={hasAnyQueueReservation()}
         isCurrentUserUsingAnyCourt={isCurrentUserUsingAnyCourt}
@@ -268,6 +284,7 @@ function AppContent() {
         handleCancel={handleCancel}
         canReserve={canReserve}
         user={user}
+        courtStatus={courtStatus}
       />
 
       <BottomNavigation />

@@ -78,6 +78,20 @@ export const api = {
     return response.json();
   },
 
+  advanceQueue: async (courtId: number) => {
+    const response = await fetch(`${API_BASE}/courts/${courtId}/advance-queue`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to advance queue: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
   getCourtUsageStatus: async () => {
     const response = await fetch(`${API_BASE}/courts/usage-status`, {
       headers: getAuthHeaders()

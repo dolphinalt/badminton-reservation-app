@@ -8,6 +8,7 @@ interface CourtStatusProps {
   };
   onTakeCourt: () => void;
   onReleaseCourt: () => void;
+  onAdvanceQueue: () => void;
   hasActiveReservation: boolean;
   hasAnyQueueReservation: boolean;
   isCurrentUserUsingAnyCourt: boolean;
@@ -18,6 +19,7 @@ export default function CourtStatus({
   courtStatus,
   onTakeCourt,
   onReleaseCourt,
+  onAdvanceQueue,
   hasActiveReservation,
   hasAnyQueueReservation,
   isCurrentUserUsingAnyCourt,
@@ -33,13 +35,12 @@ export default function CourtStatus({
 
   const canReleaseCourt = isCourtInUse && isCurrentUserUsingThisCourt;
 
-  // Automatically release court when timer reaches 0
+  // Automatically advance queue when timer reaches 0
   useEffect(() => {
     if (courtStatus.time === "0:00" && isCurrentUserUsingThisCourt) {
-      console.log("Timer reached 0, automatically releasing court");
-      onReleaseCourt();
+      onAdvanceQueue();
     }
-  }, [courtStatus.time, isCurrentUserUsingThisCourt, onReleaseCourt]);
+  }, [courtStatus.time, isCurrentUserUsingThisCourt, onAdvanceQueue]);
 
   return (
     <div className="flex justify-between items-center">

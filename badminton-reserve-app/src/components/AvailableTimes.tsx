@@ -7,6 +7,11 @@ interface AvailableTimesProps {
   handleCancel: (reservationId: number) => void;
   canReserve: () => boolean;
   user: any;
+  courtStatus: {
+    status: string;
+    time: string | null;
+    color: string;
+  };
 }
 
 export default function AvailableTimes({
@@ -16,8 +21,17 @@ export default function AvailableTimes({
   handleCancel,
   canReserve,
   user,
+  courtStatus,
 }: AvailableTimesProps) {
   const courtQueue = queueData[selectedCourt] || [];
+
+  // Check if court is open and there's no queue - user should take court instead
+  const isCourtOpen = courtStatus.status === "Open";
+  const hasNoQueue = courtQueue.length === 0;
+  const shouldTakeCourtInstead = isCourtOpen && hasNoQueue;
+
+  // Modify canReserve logic to prevent joining queue when court should be taken
+  const canJoinQueue = canReserve() && !shouldTakeCourtInstead;
 
   return (
     <div className="px-6 mt-6">
@@ -28,18 +42,20 @@ export default function AvailableTimes({
         <div className="bg-white p-4 rounded-lg">
           <div className="flex justify-between items-center">
             <span className="text-lg font-medium text-gray-900">
-              Add your spot in line
+              {shouldTakeCourtInstead
+                ? "Add your spot in line"
+                : "Add your spot in line"}
             </span>
             <button
               onClick={() => handleReserve(selectedCourt)}
-              disabled={!canReserve()}
+              disabled={!canJoinQueue}
               className={`px-4 py-2 rounded-full font-medium transition-colors ${
-                canReserve()
+                canJoinQueue
                   ? "border border-teal-600 border-2 text-teal-600 hover:bg-teal-50 font-bold"
                   : "border border-gray-300 border-2 text-gray-400 bg-gray-100 cursor-not-allowed"
               }`}
             >
-              Join Queue
+              {shouldTakeCourtInstead ? "Join Queue" : "Join Queue"}
             </button>
           </div>
         </div>

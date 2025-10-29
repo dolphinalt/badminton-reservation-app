@@ -136,8 +136,10 @@ export default function UnauthenticatedView() {
         </div>
 
         <div className="space-y-4">
-          <LoginButton />
-          <p className="text-xs text-gray-500">
+          <div className="flex justify-center">
+            <LoginButton />
+          </div>
+          <p className="text-xs text-gray-500 text-center">
             By signing in, you agree to our terms of service and can reserve
             courts for up to 30 minutes.
           </p>

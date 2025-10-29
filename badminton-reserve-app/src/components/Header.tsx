@@ -11,6 +11,7 @@ interface HeaderProps {
   };
   onTakeCourt: () => void;
   onReleaseCourt: () => void;
+  onAdvanceQueue: () => void;
   hasActiveReservation: boolean;
   hasAnyQueueReservation: boolean;
   isCurrentUserUsingAnyCourt: boolean;
@@ -23,6 +24,7 @@ export default function Header({
   courtStatus,
   onTakeCourt,
   onReleaseCourt,
+  onAdvanceQueue,
   hasActiveReservation,
   hasAnyQueueReservation,
   isCurrentUserUsingAnyCourt,
@@ -41,6 +43,7 @@ export default function Header({
         courtStatus={courtStatus}
         onTakeCourt={onTakeCourt}
         onReleaseCourt={onReleaseCourt}
+        onAdvanceQueue={onAdvanceQueue}
         hasActiveReservation={hasActiveReservation}
         hasAnyQueueReservation={hasAnyQueueReservation}
         isCurrentUserUsingAnyCourt={isCurrentUserUsingAnyCourt}

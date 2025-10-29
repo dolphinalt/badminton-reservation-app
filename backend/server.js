@@ -239,6 +239,32 @@ app.post('/api/courts/:id/take', authenticateToken, async (req, res) => {
     const startTime = new Date();
     const endTime = new Date(startTime.getTime() + 1 * 60 * 1000);
     
+    // Remove user from queue if they have a reservation for this court
+    const userReservation = await database.get(
+      `SELECT * FROM reservations WHERE user_id = ? AND court_id = ? AND status = 'reserved'`,
+      [userId, courtId]
+    );
+    
+    if (userReservation) {
+      console.log(`Removing user ${userId} from queue for court ${courtId} as they're taking the court`);
+      
+      // Delete the user's reservation
+      await database.run(
+        `DELETE FROM reservations WHERE id = ?`,
+        [userReservation.id]
+      );
+      
+      // Shift everyone else up in the queue
+      await database.run(
+        `UPDATE reservations 
+         SET queue_position = queue_position - 1 
+         WHERE court_id = ? AND status = 'reserved' AND queue_position > ?`,
+        [courtId, userReservation.queue_position]
+      );
+      
+      console.log(`Queue updated: removed user ${userId} and shifted positions`);
+    }
+    
     // Create court session
     const result = await database.run(
       `INSERT INTO court_sessions (court_id, user_id, expires_at) VALUES (?, ?, ?)`,
@@ -539,6 +565,48 @@ app.post('/api/courts/:id/release', authenticateToken, async (req, res) => {
   }
 });
 
+// Advance queue endpoint - releases current session and starts next person in queue
+app.post('/api/courts/:id/advance-queue', authenticateToken, async (req, res) => {
+  try {
+    const courtId = parseInt(req.params.id);
+    const userId = req.user.userId;
+
+    console.log(`Manual queue advance triggered for court ${courtId} by user ${userId}`);
+
+    // Check if user has an active session on this court
+    const activeSession = await database.get(
+      `SELECT * FROM court_sessions 
+       WHERE court_id = ? AND user_id = ? AND status = 'active'`,
+      [courtId, userId]
+    );
+
+    if (!activeSession) {
+      return res.status(400).json({ error: 'No active session found for this court' });
+    }
+
+    // End the current session
+    await database.run(
+      `UPDATE court_sessions 
+       SET status = 'completed' 
+       WHERE id = ?`,
+      [activeSession.id]
+    );
+
+    console.log(`Ended session ${activeSession.id} for court ${courtId}`);
+
+    // Immediately advance the queue
+    await autoStartNextInQueue(courtId);
+
+    res.json({ 
+      message: 'Court released and queue advanced successfully',
+      court_id: courtId
+    });
+  } catch (error) {
+    console.error('Error advancing queue:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Public endpoint for unauthenticated users to view court status
 app.get('/api/public/courts-status', async (req, res) => {
   try {
@@ -597,6 +665,45 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// Test endpoint to manually trigger auto-advance (for debugging)
+app.post('/api/test/trigger-auto-advance/:courtId', async (req, res) => {
+  try {
+    const courtId = parseInt(req.params.courtId);
+    console.log(`Manually triggering auto-advance for court ${courtId}`);
+    await autoStartNextInQueue(courtId);
+    res.json({ message: `Auto-advance triggered for court ${courtId}` });
+  } catch (error) {
+    console.error('Error in test trigger:', error);
+    res.status(500).json({ error: 'Failed to trigger auto-advance' });
+  }
+});
+
+// Test endpoint to create expired session (for debugging)
+app.post('/api/test/create-expired-session/:courtId', async (req, res) => {
+  try {
+    const courtId = parseInt(req.params.courtId);
+    const userId = 1; // Test user ID
+    
+    // Create a session that expired 1 minute ago
+    const expiredTime = new Date(Date.now() - 60000).toISOString();
+    
+    const result = await database.run(
+      `INSERT INTO court_sessions (court_id, user_id, expires_at, status) VALUES (?, ?, ?, 'active')`,
+      [courtId, userId, expiredTime]
+    );
+    
+    console.log(`Created expired session ${result.id} for court ${courtId}`);
+    res.json({ 
+      message: `Created expired session for court ${courtId}`,
+      sessionId: result.id,
+      expiredAt: expiredTime
+    });
+  } catch (error) {
+    console.error('Error creating expired session:', error);
+    res.status(500).json({ error: 'Failed to create expired session' });
+  }
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
@@ -614,9 +721,39 @@ app.listen(PORT, () => {
 
 // Cleanup expired sessions periodically
 function startSessionCleanup() {
+  console.log('Starting session cleanup interval...');
+  
   // Run cleanup every 5 seconds for more responsive expiration
   setInterval(async () => {
     try {
+      // Check current time and active sessions for debugging
+      const currentTime = new Date().toISOString();
+      const activeSessions = await database.all(
+        `SELECT id, court_id, user_id, expires_at FROM court_sessions 
+         WHERE status = 'active'`
+      );
+      
+      console.log(`[${currentTime}] Cleanup check: ${activeSessions.length} active sessions`);
+      if (activeSessions.length > 0) {
+        activeSessions.forEach(session => {
+          const expiresAt = new Date(session.expires_at);
+          const now = new Date();
+          const timeLeft = Math.ceil((expiresAt.getTime() - now.getTime()) / 1000);
+          console.log(`  Session ${session.id}: Court ${session.court_id}, User ${session.user_id}, expires in ${timeLeft}s`);
+        });
+      }
+      
+      // First, find expired sessions before marking them as completed
+      const expiredSessions = await database.all(
+        `SELECT * FROM court_sessions 
+         WHERE status = 'active' AND expires_at <= datetime('now')`
+      );
+      
+      if (expiredSessions.length > 0) {
+        console.log(`Found ${expiredSessions.length} expired session(s) to process`);
+      }
+      
+      // Mark expired sessions as completed
       const result = await database.run(
         `UPDATE court_sessions 
          SET status = 'completed' 
@@ -625,11 +762,73 @@ function startSessionCleanup() {
       
       if (result.changes > 0) {
         console.log(`Auto-completed ${result.changes} court session(s) - timer reached 0`);
+        
+        // For each expired session, check if there's a queue and auto-start the next person
+        for (const expiredSession of expiredSessions) {
+          console.log(`Processing expired session for court ${expiredSession.court_id}, user ${expiredSession.user_id}`);
+          await autoStartNextInQueue(expiredSession.court_id);
+        }
       }
     } catch (error) {
       console.error('Error cleaning up expired sessions:', error);
     }
   }, 5000); // Check every 5 seconds for more responsive expiration
+}
+
+// Auto-start the next person in queue when a court becomes available
+async function autoStartNextInQueue(courtId) {
+  try {
+    console.log(`\n=== AUTO-ADVANCE QUEUE for Court ${courtId} ===`);
+    
+    // Get the first person in queue for this court
+    const nextInQueue = await database.get(
+      `SELECT * FROM reservations 
+       WHERE court_id = ? AND status = 'reserved' 
+       ORDER BY queue_position ASC 
+       LIMIT 1`,
+      [courtId]
+    );
+    
+    console.log(`Next in queue:`, nextInQueue);
+    
+    if (nextInQueue) {
+      console.log(`Auto-starting next person in queue for court ${courtId}: User ${nextInQueue.user_id} (${nextInQueue.user_name})`);
+      
+      // Remove this person from the queue
+      const deleteResult = await database.run(
+        `DELETE FROM reservations WHERE id = ?`,
+        [nextInQueue.id]
+      );
+      console.log(`Deleted reservation ${nextInQueue.id}, rows affected: ${deleteResult.changes}`);
+      
+      // Shift everyone else up in the queue
+      const updateResult = await database.run(
+        `UPDATE reservations 
+         SET queue_position = queue_position - 1 
+         WHERE court_id = ? AND status = 'reserved' AND queue_position > ?`,
+        [courtId, nextInQueue.queue_position]
+      );
+      console.log(`Updated queue positions, rows affected: ${updateResult.changes}`);
+      
+      // Calculate session duration (1 minute)
+      const startTime = new Date();
+      const endTime = new Date(startTime.getTime() + 1 * 60 * 1000);
+      
+      // Create new court session for the next person
+      const sessionResult = await database.run(
+        `INSERT INTO court_sessions (court_id, user_id, expires_at) VALUES (?, ?, ?)`,
+        [courtId, nextInQueue.user_id, endTime.toISOString()]
+      );
+      
+      console.log(`Successfully started court session for user ${nextInQueue.user_id} on court ${courtId}`);
+      console.log(`Session ID: ${sessionResult.id}, expires at: ${endTime.toISOString()}`);
+    } else {
+      console.log(`No queue for court ${courtId} - court is now available`);
+    }
+    console.log(`=== END AUTO-ADVANCE ===\n`);
+  } catch (error) {
+    console.error(`Error auto-starting next person in queue for court ${courtId}:`, error);
+  }
 }
 
 // Graceful shutdown
