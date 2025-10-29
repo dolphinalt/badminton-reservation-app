@@ -810,9 +810,9 @@ async function autoStartNextInQueue(courtId) {
       );
       console.log(`Updated queue positions, rows affected: ${updateResult.changes}`);
       
-      // Calculate session duration (1 minute)
+      // Calculate session duration (30 minutes)
       const startTime = new Date();
-      const endTime = new Date(startTime.getTime() + 1 * 60 * 1000);
+      const endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
       
       // Create new court session for the next person
       const sessionResult = await database.run(
