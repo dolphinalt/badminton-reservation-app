@@ -25,7 +25,7 @@ export const useAuth = () => {
   return context;
 };
 
-const API_BASE = "http://localhost:3001";
+const API_BASE = "http://ethanzhao.us:3001";
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
