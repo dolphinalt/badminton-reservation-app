@@ -65,6 +65,24 @@ class Database {
         FOREIGN KEY(user_id) REFERENCES users(id)
       )`);
 
+      // Create groups table
+      this.db.run(`CREATE TABLE IF NOT EXISTS groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_code TEXT UNIQUE NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+
+      // Create group_members table
+      this.db.run(`CREATE TABLE IF NOT EXISTS group_members (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(group_id) REFERENCES groups(id),
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        UNIQUE(group_id, user_id)
+      )`);
+
       // Seed initial data
       this.seedData();
     });

@@ -224,6 +224,31 @@ app.post('/api/courts/:id/take', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'You are already using a court' });
     }
     
+    // Check if user is in a group and if any group member is using a court
+    const userGroup = await database.get(
+      `SELECT g.id, g.group_code FROM group_members gm
+       JOIN groups g ON gm.group_id = g.id
+       WHERE gm.user_id = ?`,
+      [userId]
+    );
+    
+    if (userGroup) {
+      // Check if any group member is currently using a court
+      const groupActiveSession = await database.get(
+        `SELECT cs.*, u.name as user_name FROM court_sessions cs
+         JOIN group_members gm ON cs.user_id = gm.user_id
+         JOIN users u ON cs.user_id = u.id
+         WHERE gm.group_id = ? AND cs.status = 'active'`,
+        [userGroup.id]
+      );
+      
+      if (groupActiveSession) {
+        return res.status(400).json({ 
+          error: `Your group is already using a court (${groupActiveSession.user_name} is using Court ${groupActiveSession.court_id}). Group members cannot use multiple courts simultaneously.` 
+        });
+      }
+    }
+    
     // Check if this court is available
     const activeSession = await database.get(
       `SELECT * FROM court_sessions 
@@ -235,9 +260,9 @@ app.post('/api/courts/:id/take', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Court is currently in use' });
     }
     
-    // Calculate session duration (1 minute)
+    // Calculate session duration (30 minutes)
     const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + 1 * 60 * 1000);
+    const endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
     
     // Remove user from queue if they have a reservation for this court
     const userReservation = await database.get(
@@ -315,6 +340,216 @@ app.get('/api/queue', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Group endpoints
+app.post('/api/groups/create', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // Check if user is already in a group
+    const existingMembership = await database.get(
+      `SELECT gm.*, g.group_code FROM group_members gm
+       JOIN groups g ON gm.group_id = g.id
+       WHERE gm.user_id = ?`,
+      [userId]
+    );
+    
+    if (existingMembership) {
+      return res.status(400).json({ 
+        error: 'You are already in a group',
+        groupCode: existingMembership.group_code
+      });
+    }
+
+    // Generate unique group code
+    const groupCode = await generateUniqueGroupCode();
+    
+    // Create group
+    const groupResult = await database.run(
+      `INSERT INTO groups (group_code) VALUES (?)`,
+      [groupCode]
+    );
+    
+    // Add user to group
+    await database.run(
+      `INSERT INTO group_members (group_id, user_id) VALUES (?, ?)`,
+      [groupResult.id, userId]
+    );
+    
+    res.json({ 
+      groupCode,
+      groupId: groupResult.id,
+      message: 'Group created successfully'
+    });
+  } catch (error) {
+    console.error('Error creating group:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/groups/join', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { groupCode } = req.body;
+    
+    if (!groupCode) {
+      return res.status(400).json({ error: 'Group code is required' });
+    }
+    
+    // Check if user is already in a group
+    const existingMembership = await database.get(
+      `SELECT * FROM group_members WHERE user_id = ?`,
+      [userId]
+    );
+    
+    if (existingMembership) {
+      return res.status(400).json({ error: 'You are already in a group' });
+    }
+    
+    // Find group by code
+    const group = await database.get(
+      `SELECT * FROM groups WHERE group_code = ?`,
+      [groupCode]
+    );
+    
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found' });
+    }
+    
+    // Add user to group
+    await database.run(
+      `INSERT INTO group_members (group_id, user_id) VALUES (?, ?)`,
+      [group.id, userId]
+    );
+    
+    res.json({ 
+      groupCode,
+      groupId: group.id,
+      message: 'Successfully joined group'
+    });
+  } catch (error) {
+    console.error('Error joining group:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/groups/my-group', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // Get user's group info
+    const groupInfo = await database.get(
+      `SELECT g.id, g.group_code, g.created_at
+       FROM group_members gm
+       JOIN groups g ON gm.group_id = g.id
+       WHERE gm.user_id = ?`,
+      [userId]
+    );
+    
+    if (!groupInfo) {
+      return res.json({ group: null, members: [] });
+    }
+    
+    // Get all group members
+    const members = await database.all(
+      `SELECT u.id, u.name, u.email, u.avatar, gm.joined_at
+       FROM group_members gm
+       JOIN users u ON gm.user_id = u.id
+       WHERE gm.group_id = ?
+       ORDER BY gm.joined_at ASC`,
+      [groupInfo.id]
+    );
+    
+    res.json({ 
+      group: groupInfo,
+      members
+    });
+  } catch (error) {
+    console.error('Error fetching group info:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/groups/leave', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // Get user's group membership
+    const membership = await database.get(
+      `SELECT gm.*, g.group_code
+       FROM group_members gm
+       JOIN groups g ON gm.group_id = g.id
+       WHERE gm.user_id = ?`,
+      [userId]
+    );
+    
+    if (!membership) {
+      return res.status(404).json({ error: 'You are not in a group' });
+    }
+    
+    // Remove user from group
+    await database.run(
+      `DELETE FROM group_members WHERE user_id = ?`,
+      [userId]
+    );
+    
+    // Check if group is now empty
+    const remainingMembers = await database.get(
+      `SELECT COUNT(*) as count FROM group_members WHERE group_id = ?`,
+      [membership.group_id]
+    );
+    
+    // If group is empty, delete it
+    if (remainingMembers.count === 0) {
+      await database.run(
+        `DELETE FROM groups WHERE id = ?`,
+        [membership.group_id]
+      );
+    }
+    
+    res.json({ message: 'Successfully left group' });
+  } catch (error) {
+    console.error('Error leaving group:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Helper function to generate unique group codes
+async function generateUniqueGroupCode() {
+  const words = [
+    'alpha', 'beta', 'gamma', 'delta', 'echo', 'foxtrot', 'golf', 'hotel',
+    'india', 'juliet', 'kilo', 'lima', 'mike', 'november', 'oscar', 'papa',
+    'quebec', 'romeo', 'sierra', 'tango', 'uniform', 'victor', 'whiskey', 'xray',
+    'yankee', 'zulu', 'fire', 'water', 'earth', 'wind', 'storm', 'thunder',
+    'lightning', 'ocean', 'mountain', 'forest', 'river', 'valley', 'desert', 'snow',
+    'sun', 'moon', 'star', 'comet', 'planet', 'galaxy', 'nebula', 'cosmos',
+    'phoenix', 'dragon', 'eagle', 'lion', 'tiger', 'wolf', 'bear', 'shark',
+    'falcon', 'hawk', 'raven', 'owl', 'panther', 'leopard', 'cheetah', 'jaguar'
+  ];
+  
+  let attempts = 0;
+  while (attempts < 10) {
+    // Generate random 3-word code
+    const shuffled = words.sort(() => 0.5 - Math.random());
+    const groupCode = shuffled.slice(0, 3).join('-');
+    
+    // Check if code already exists
+    const existing = await database.get(
+      `SELECT id FROM groups WHERE group_code = ?`,
+      [groupCode]
+    );
+    
+    if (!existing) {
+      return groupCode;
+    }
+    
+    attempts++;
+  }
+  
+  // Fallback: add timestamp
+  const fallbackCode = words.sort(() => 0.5 - Math.random()).slice(0, 3).join('-') + '-' + Date.now();
+  return fallbackCode;
+}
 
 // Gym status route - always open for queue system
 app.get('/api/gym/open-status', async (req, res) => {
@@ -433,6 +668,46 @@ app.post('/api/reservations', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Cannot make reservation while using a court' });
     }
     
+    // Check if user is in a group and if any group member has a reservation or active session
+    const userGroup = await database.get(
+      `SELECT g.id, g.group_code FROM group_members gm
+       JOIN groups g ON gm.group_id = g.id
+       WHERE gm.user_id = ?`,
+      [userId]
+    );
+    
+    if (userGroup) {
+      // Check if any group member has an active reservation
+      const groupReservation = await database.get(
+        `SELECT r.*, u.name as user_name FROM reservations r
+         JOIN group_members gm ON r.user_id = gm.user_id
+         JOIN users u ON r.user_id = u.id
+         WHERE gm.group_id = ? AND r.status = 'reserved'`,
+        [userGroup.id]
+      );
+      
+      if (groupReservation) {
+        return res.status(400).json({ 
+          error: `Your group already has a reservation (${groupReservation.user_name} is in queue for Court ${groupReservation.court_id}). Group members cannot make separate reservations.` 
+        });
+      }
+      
+      // Check if any group member is currently using a court
+      const groupActiveSession = await database.get(
+        `SELECT cs.*, u.name as user_name FROM court_sessions cs
+         JOIN group_members gm ON cs.user_id = gm.user_id
+         JOIN users u ON cs.user_id = u.id
+         WHERE gm.group_id = ? AND cs.status = 'active'`,
+        [userGroup.id]
+      );
+      
+      if (groupActiveSession) {
+        return res.status(400).json({ 
+          error: `Your group is currently using a court (${groupActiveSession.user_name} is using Court ${groupActiveSession.court_id}). Group members cannot make reservations while the group is playing.` 
+        });
+      }
+    }
+    
     // Get the next queue position for this court
     const lastPosition = await database.get(
       `SELECT MAX(queue_position) as max_pos FROM reservations WHERE court_id = ? AND status = 'reserved'`,
@@ -524,6 +799,48 @@ app.get('/api/courts/user-usage-status', authenticateToken, async (req, res) => 
     });
   } catch (error) {
     console.error('Error checking user court usage:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Check if any group member is using a court
+app.get('/api/courts/group-usage-status', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // First, check if user is in a group
+    const userGroup = await database.get(
+      `SELECT g.id, g.group_code FROM group_members gm
+       JOIN groups g ON gm.group_id = g.id
+       WHERE gm.user_id = ?`,
+      [userId]
+    );
+    
+    if (!userGroup) {
+      return res.json({ 
+        isGroupMemberUsingCourt: false,
+        activeGroupSession: null 
+      });
+    }
+    
+    // Check if any group member is currently using a court
+    const groupActiveSession = await database.get(
+      `SELECT cs.*, u.name as user_name, cs.court_id
+       FROM court_sessions cs
+       JOIN users u ON cs.user_id = u.id
+       JOIN group_members gm ON cs.user_id = gm.user_id
+       WHERE gm.group_id = ? AND cs.status = 'active' AND cs.expires_at > datetime('now')`,
+      [userGroup.id]
+    );
+    
+    const isGroupMemberUsingCourt = !!groupActiveSession;
+    
+    res.json({ 
+      isGroupMemberUsingCourt,
+      activeGroupSession: groupActiveSession 
+    });
+  } catch (error) {
+    console.error('Error checking group court usage:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -657,6 +974,58 @@ app.get('/api/public/courts-status', async (req, res) => {
   } catch (error) {
     console.error('Error fetching public court status:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Test endpoint to add random users to queue (for testing)
+app.post('/api/test/populate-queue/:courtId', async (req, res) => {
+  try {
+    const courtId = parseInt(req.params.courtId);
+    
+    const randomNames = [
+      'Alex Johnson', 'Sarah Chen', 'Mike Rodriguez', 'Emma Williams',
+      'David Kim', 'Lisa Brown', 'James Wilson', 'Anna Lee',
+      'Chris Taylor', 'Maya Patel', 'Ryan O\'Connor', 'Sofia Garcia'
+    ];
+    
+    // Shuffle names and take 4
+    const shuffledNames = randomNames.sort(() => 0.5 - Math.random());
+    const selectedNames = shuffledNames.slice(0, 4);
+    
+    console.log(`Adding ${selectedNames.length} random users to queue for court ${courtId}`);
+    
+    // Get the current highest queue position for this court
+    const lastPosition = await database.get(
+      `SELECT MAX(queue_position) as max_pos FROM reservations WHERE court_id = ? AND status = 'reserved'`,
+      [courtId]
+    );
+    
+    let nextPosition = (lastPosition?.max_pos || 0) + 1;
+    
+    // Create fake user IDs (starting from 1000 to avoid conflicts)
+    let fakeUserId = 1000;
+    
+    for (const name of selectedNames) {
+      // Create reservation
+      await database.run(
+        `INSERT INTO reservations (court_id, user_id, user_name, queue_position) VALUES (?, ?, ?, ?)`,
+        [courtId, fakeUserId, name, nextPosition]
+      );
+      
+      console.log(`Added ${name} to queue position ${nextPosition} for court ${courtId}`);
+      
+      fakeUserId++;
+      nextPosition++;
+    }
+    
+    res.json({ 
+      message: `Successfully added ${selectedNames.length} users to queue for court ${courtId}`,
+      users: selectedNames,
+      courtId 
+    });
+  } catch (error) {
+    console.error('Error populating queue:', error);
+    res.status(500).json({ error: 'Failed to populate queue' });
   }
 });
 

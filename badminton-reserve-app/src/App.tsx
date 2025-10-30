@@ -4,23 +4,47 @@ import Header from "./components/Header";
 import AvailableTimes from "./components/AvailableTimes";
 import BottomNavigation from "./components/BottomNavigation";
 import UnauthenticatedView from "./components/UnauthenticatedView";
+import GroupHeader from "./components/Group";
+import { useGroupManagement } from "./hooks/useGroupManagement";
 import { api } from "./utils/api";
 
 function AppContent() {
-  const { isAuthenticated, loading, user } = useAuth();
+  const { isAuthenticated, loading, user, logout } = useAuth();
   const [selectedCourt, setSelectedCourt] = useState(1);
+  const [activeTab, setActiveTab] = useState<"reservations" | "groups">(
+    "reservations"
+  );
   const [userReservations, setUserReservations] = useState<any[]>([]);
+  // @ts-ignore - Used in reservation functionality
   const [allReservations, setAllReservations] = useState<any[]>([]);
+  // @ts-ignore - Used in reservation functionality
   const [hasActiveCourtUsage, setHasActiveCourtUsage] = useState(false);
   const [isCurrentUserUsingAnyCourt, setIsCurrentUserUsingAnyCourt] =
     useState(false);
+  const [isGroupMemberUsingCourt, setIsGroupMemberUsingCourt] = useState(false);
   const [queueData, setQueueData] = useState<any>({});
   const [courtStatus, setCourtStatus] = useState({
     status: "Open",
     time: null,
     color: "text-green-500",
   });
+  // @ts-ignore - Used in reservation functionality
   const [error, setError] = useState<string | null>(null);
+
+  // Group management hook
+  const {
+    group,
+    members,
+    joinCode,
+    isJoining,
+    isCreating,
+    isLeaving,
+    setJoinCode,
+    createGroup,
+    joinGroup,
+    leaveGroup,
+    copyGroupCode,
+  } = useGroupManagement();
 
   // Load initial data
   useEffect(() => {
@@ -28,6 +52,7 @@ function AppContent() {
       loadQueue();
       loadCourtUsageStatus();
       loadUserCourtUsageStatus();
+      loadGroupCourtUsageStatus();
       loadCourtStatus(selectedCourt);
       loadUserReservations();
       loadAllReservations();
@@ -42,6 +67,7 @@ function AppContent() {
       loadCourtStatus(selectedCourt);
       loadCourtUsageStatus();
       loadUserCourtUsageStatus();
+      loadGroupCourtUsageStatus();
       loadAllReservations();
       loadUserReservations(); // Also refresh user reservations to update activeReservation for selected court
       loadQueue(); // Refresh queue data
@@ -80,6 +106,15 @@ function AppContent() {
     }
   };
 
+  const loadGroupCourtUsageStatus = async () => {
+    try {
+      const data = await api.getGroupCourtUsageStatus();
+      setIsGroupMemberUsingCourt(data.isGroupMemberUsingCourt);
+    } catch (error) {
+      console.error("Error loading group court usage status:", error);
+    }
+  };
+
   const loadCourtStatus = async (courtId: number) => {
     try {
       const data = await api.getCourtStatus(courtId);
@@ -92,6 +127,7 @@ function AppContent() {
         // Force immediate refresh of all user states when court session auto-completes
         setTimeout(() => {
           loadUserCourtUsageStatus();
+          loadGroupCourtUsageStatus();
           loadUserReservations();
           loadCourtUsageStatus();
         }, 100);
@@ -145,6 +181,7 @@ function AppContent() {
       loadQueue();
       loadUserReservations();
       loadAllReservations();
+      loadGroupCourtUsageStatus();
     } catch (error: any) {
       console.error("Error with reservation:", error);
       setError(error.message || "Failed to update reservation");
@@ -164,6 +201,11 @@ function AppContent() {
   const canReserve = () => {
     // Can't make reservations if user is currently using a court
     if (isCurrentUserUsingAnyCourt) {
+      return false;
+    }
+
+    // Can't make reservations if any group member is using a court
+    if (isGroupMemberUsingCourt) {
       return false;
     }
 
@@ -187,6 +229,7 @@ function AppContent() {
       loadQueue();
       loadUserReservations();
       loadAllReservations();
+      loadGroupCourtUsageStatus();
     } catch (error: any) {
       console.error("Error cancelling reservation:", error);
       setError(error.message || "Failed to cancel reservation");
@@ -201,6 +244,7 @@ function AppContent() {
       loadCourtStatus(selectedCourt);
       loadCourtUsageStatus();
       loadUserCourtUsageStatus();
+      loadGroupCourtUsageStatus();
       loadUserReservations();
     } catch (error: any) {
       console.error("Error taking court:", error);
@@ -216,6 +260,7 @@ function AppContent() {
       loadCourtStatus(selectedCourt);
       loadCourtUsageStatus();
       loadUserCourtUsageStatus();
+      loadGroupCourtUsageStatus();
       loadUserReservations();
     } catch (error: any) {
       console.error("Error releasing court:", error);
@@ -226,12 +271,12 @@ function AppContent() {
   const advanceQueueTimer = async () => {
     try {
       setError(null);
-      console.log(`Advancing queue for court ${selectedCourt}`);
       await api.advanceQueue(selectedCourt);
       // Refresh all data to reflect queue changes
       loadCourtStatus(selectedCourt);
       loadCourtUsageStatus();
       loadUserCourtUsageStatus();
+      loadGroupCourtUsageStatus();
       loadUserReservations();
       loadQueue();
       loadAllReservations();
@@ -264,30 +309,53 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      <Header
-        selectedCourt={selectedCourt}
-        setSelectedCourt={setSelectedCourt}
-        courtStatus={courtStatus}
-        onTakeCourt={startCourtTimer}
-        onReleaseCourt={releaseCourtTimer}
-        onAdvanceQueue={advanceQueueTimer}
-        hasActiveReservation={hasActiveReservation()}
-        hasAnyQueueReservation={hasAnyQueueReservation()}
-        isCurrentUserUsingAnyCourt={isCurrentUserUsingAnyCourt}
-        isCurrentUserUsingThisCourt={isCurrentUserUsingThisCourt()}
-      />
+      {activeTab === "reservations" ? (
+        <>
+          <Header
+            selectedCourt={selectedCourt}
+            setSelectedCourt={setSelectedCourt}
+            courtStatus={courtStatus}
+            onTakeCourt={startCourtTimer}
+            onReleaseCourt={releaseCourtTimer}
+            onAdvanceQueue={advanceQueueTimer}
+            hasActiveReservation={hasActiveReservation()}
+            hasAnyQueueReservation={hasAnyQueueReservation()}
+            isCurrentUserUsingAnyCourt={isCurrentUserUsingAnyCourt}
+            isCurrentUserUsingThisCourt={isCurrentUserUsingThisCourt()}
+            isGroupMemberUsingCourt={isGroupMemberUsingCourt}
+          />
 
-      <AvailableTimes
-        selectedCourt={selectedCourt}
-        queueData={queueData}
-        handleReserve={handleReserve}
-        handleCancel={handleCancel}
-        canReserve={canReserve}
-        user={user}
-        courtStatus={courtStatus}
-      />
+          <AvailableTimes
+            selectedCourt={selectedCourt}
+            queueData={queueData}
+            handleReserve={handleReserve}
+            handleCancel={handleCancel}
+            canReserve={canReserve}
+            user={user}
+            courtStatus={courtStatus}
+          />
+        </>
+      ) : (
+        <>
+          <GroupHeader
+            joinCode={joinCode}
+            isJoining={isJoining}
+            isCreating={isCreating}
+            onJoinCodeChange={setJoinCode}
+            onJoinGroup={joinGroup}
+            onCreateGroup={createGroup}
+            group={group}
+            members={members}
+            isLeaving={isLeaving}
+            onCopyCode={copyGroupCode}
+            onLeaveGroup={leaveGroup}
+            user={user}
+            logout={logout}
+          />
+        </>
+      )}
 
-      <BottomNavigation />
+      <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );
 }

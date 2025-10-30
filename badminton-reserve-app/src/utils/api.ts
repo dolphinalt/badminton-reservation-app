@@ -116,6 +116,18 @@ export const api = {
     return response.json();
   },
 
+  getGroupCourtUsageStatus: async () => {
+    const response = await fetch(`${API_BASE}/courts/group-usage-status`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch group usage status: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
   // Reservation-related endpoints
   getReservations: async () => {
     const response = await fetch(`${API_BASE}/reservations`, {
@@ -190,6 +202,62 @@ export const api = {
     
     if (!response.ok) {
       throw new Error(`Failed to fetch queue: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
+  // Group endpoints
+  createGroup: async () => {
+    const response = await fetch(`${API_BASE}/groups/create`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to create group: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
+  joinGroup: async (groupCode: string) => {
+    const response = await fetch(`${API_BASE}/groups/join`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ groupCode })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to join group: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
+  getMyGroup: async () => {
+    const response = await fetch(`${API_BASE}/groups/my-group`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch group info: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
+  leaveGroup: async () => {
+    const response = await fetch(`${API_BASE}/groups/leave`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to leave group: ${response.statusText}`);
     }
     
     return response.json();

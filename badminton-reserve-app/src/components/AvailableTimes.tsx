@@ -63,9 +63,6 @@ export default function AvailableTimes({
         {/* Show current queue */}
         {courtQueue.length > 0 ? (
           <div className="space-y-2">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Current Queue:
-            </h3>
             {courtQueue.map((reservation: any, index: number) => (
               <TimeSlot
                 key={reservation.id}

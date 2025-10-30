@@ -16,6 +16,7 @@ interface HeaderProps {
   hasAnyQueueReservation: boolean;
   isCurrentUserUsingAnyCourt: boolean;
   isCurrentUserUsingThisCourt: boolean;
+  isGroupMemberUsingCourt: boolean;
 }
 
 export default function Header({
@@ -28,6 +29,7 @@ export default function Header({
   hasAnyQueueReservation,
   isCurrentUserUsingAnyCourt,
   isCurrentUserUsingThisCourt,
+  isGroupMemberUsingCourt,
 }: HeaderProps) {
   return (
     <div className="bg-white px-6 pt-8 pb-6">
@@ -46,6 +48,7 @@ export default function Header({
         hasAnyQueueReservation={hasAnyQueueReservation}
         isCurrentUserUsingAnyCourt={isCurrentUserUsingAnyCourt}
         isCurrentUserUsingThisCourt={isCurrentUserUsingThisCourt}
+        isGroupMemberUsingCourt={isGroupMemberUsingCourt}
       />
     </div>
   );
