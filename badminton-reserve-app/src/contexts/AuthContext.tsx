@@ -25,7 +25,7 @@ export const useAuth = () => {
   return context;
 };
 
-const API_BASE = "https://api.ethanzhao.us:3001";
+const API_BASE = "https://api.ethanzhao.us";
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,

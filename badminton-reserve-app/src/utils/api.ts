@@ -1,4 +1,4 @@
-const API_BASE = 'https://api.ethanzhao.us:3001/api';
+const API_BASE = 'https://api.ethanzhao.us/api';
 
 const getAuthHeaders = (): Record<string, string> => {
   const token = localStorage.getItem('authToken');
