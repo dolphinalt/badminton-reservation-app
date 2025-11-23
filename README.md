@@ -1,8 +1,8 @@
-# 🏸 Badminton Court Reservation App
+# 🏸 Rsrv
 
 > A modern, real-time court management application built for badminton facilities, providing seamless court reservations and session management with automatic timer controls.
 
-![Badminton Court Reservation App](./assets/img/badminton-reserve-app.jpeg "Badminton Court Reservation App")
+![Rsrv](./assets/img/badminton-reserve-app.jpeg "Badminton Court Reservation App")
 
 ## 🎯 Overview
 
